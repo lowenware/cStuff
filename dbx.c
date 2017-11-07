@@ -3,9 +3,9 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
-#include <standard/list.h>
-#include <standard/sock_utils.h>
-#include <standard/str_utils.h>
+#include "list.h"
+#include "sock_utils.h"
+#include "str_utils.h"
 #include "dbx.h"
 
 /* type --------------------------------------------------------------------- */

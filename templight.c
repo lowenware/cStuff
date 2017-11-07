@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <standard/list.h>
-#include <standard/str_utils.h>
+#include "list.h"
+#include "str_utils.h"
 
 #include "templight.h"
 
