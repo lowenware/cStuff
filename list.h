@@ -2,12 +2,12 @@
  * Copyright (c) 2017 Löwenware Ltd (https://lowenware.com)
  *
  * REPOSITORY:
- *   git://lowenware.com:standard.git
+ *   https://github.com/lowenware.com:cStuff.git
  * MAINTAINER:
  *   Ilja Kartaschoff <ik@lowenware.com>
  *
  * LICENSE and DISCLAIMER:
- *   All code stored in standard.git repository is designed to solve
+ *   All code stored in this repository is designed to solve
  *   very common and widely meet development tasks. We are not about to patent
  *   wheels here, so all code you can find in this repository is FREE:
  *   you can use, redistribute and/or modify it without any limits or 
@@ -21,8 +21,8 @@
  *
  * */
 
-#ifndef _LOWESTD_LIST_H_
-#define _LOWESTD_LIST_H_
+#ifndef _CSTUFF_LIST_H_
+#define _CSTUFF_LIST_H_
 
 #include <stdint.h>
 
