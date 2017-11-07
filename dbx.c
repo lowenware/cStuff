@@ -383,7 +383,7 @@ dbx_format_query( const char      *sql_format,
   }
   free(p);
 
-  printf ("FORMATED SQL: %s :: %d\n", sql, t);
+  /* printf ("FORMATED SQL: %s :: %d\n", sql, t); */
 
   return dbx_query(sql, on_result, on_error, u_data);
 
