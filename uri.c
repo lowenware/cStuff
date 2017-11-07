@@ -2,7 +2,7 @@
 #include "utils.h"
 
 
-#ifdef WEBSTUFF_WITH_DECODE_URI
+#ifdef CSTUFF_WITH_URI_DECODE
 
 void
 uri_decode(char *data)
