@@ -35,6 +35,29 @@
  *
  * */
 
+/* config macroses ---------------------------------------------------------- */
+
+#define CONFIG_STRING( name, path, d_value ) \
+  const char cfg ## name ## Path[] = path; \
+  const char cfg ## name ## Default[] = d_value; \
+  char * cfg ## name = NULL;
+
+#define CONFIG_DEFINE( name, path, d_value, type ) \
+  const type cfg ## name ## Path[] = path; \
+  const type cfg ## name ## Default[] = d_value; \
+  type cfg ## name = d_value;
+
+#define CONFIG_SET_DEFAULT( name ) \
+  cfg ## name = (typeof( cfg ## name) ) cfg ## name ## Default;
+
+#define CONFIG_FREE( name ) \
+  if (cfg ## name && ((void*) cfg ## name != (void*) cfg ## name ## Default)){ \
+    free( cfg ## name ); \
+    cfg ## name = NULL; \
+  }
+
+/* -------------------------------------------------------------------------- */
+
 typedef struct _config_t * config_t;
 
 typedef enum {
