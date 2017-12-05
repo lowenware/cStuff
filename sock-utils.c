@@ -2,7 +2,7 @@
 #include <string.h>
 #include <sys/select.h>
 
-#include "sock_utils.h"
+#include "sock-utils.h"
 
 int
 sock_select(int sd, uint32_t wait_usec, int mode)

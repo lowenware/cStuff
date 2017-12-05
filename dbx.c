@@ -4,8 +4,8 @@
 #include <stdarg.h>
 
 #include "list.h"
-#include "sock_utils.h"
-#include "str_utils.h"
+#include "sock-utils.h"
+#include "str-utils.h"
 #include "dbx.h"
 
 /* type --------------------------------------------------------------------- */

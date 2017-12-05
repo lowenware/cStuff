@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "query_stream.h"
+#include "query-stream.h"
 
 int
 query_stream_read(query_stream_t * q, const char * data, int size, bool is_full)

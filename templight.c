@@ -5,7 +5,7 @@
 #include <errno.h>
 
 #include "list.h"
-#include "str_utils.h"
+#include "str-utils.h"
 
 #include "templight.h"
 
