@@ -4,48 +4,129 @@
 #include <string.h>
 
 #include "config.h"
-#include "list.h"
-#include "str_utils.h"
-
-
-#define SHIFT 0            /* index of indent with line shift */
-#define EQUAL 1            /* index of indent before '=' sign */
-#define VALUE 2            /* index of indent before value  */
-#define COMNT 3            /* index of indent before comment  */
-
-/* constants ---------------------------------------------------------------- */
-
-const int  cMaxLength   = 255;
-const char cConfigTrue[]  = "1";
-const char cConfigFalse[] = "0";
 
 /* types -------------------------------------------------------------------- */
 
-struct _config_t
+struct config_line
 {
-  list_t   lines;         /* list of lines */
-  uint32_t root;          /* index of line with current section */
-  uint32_t max_id;        /* node id generator */
+  int    i_key;
+  int    l_key;
+  int    i_equal;
+  int    i_value;
+  int    l_value;
+  int    i_comment;
+  int    l_comment;
 };
 
-typedef struct
+typedef struct config_line * config_line_t;
+
+/* path --------------------------------------------------------------------- */
+
+typedef char * config_path_t;
+
+#define PATH_SIZE(x)   ( *((int *)(x-8)) )
+#define PATH_LENGTH(x) ( *((int *)(x-4)) )
+
+/* -------------------------------------------------------------------------- */
+
+static config_path_t
+config_path_new( char * data, int d_len, int d_size )
 {
-  uint8_t  indent[4];       /* array of line indents */
-  char    *key;           /* key name */
-  char    *value;         /* value name */
-  char    *comment;         /* comment name */
-  uint32_t node_id;         /* raw number of section */
-  bool     do_not_unref;      /* keep in memory */
+  config_path_t path = malloc( 4+4+d_size );
+  if (path)
+  {
+    path += 8;
+    PATH_SIZE( path )   = d_size;
+    PATH_LENGTH( path ) = d_len;
+    if (data)
+      strncpy( path, data, d_len );
+  }
 
-} config_line_t;
+  return path;
+}
 
-typedef struct
+/* -------------------------------------------------------------------------- */
+
+static void
+config_path_free( config_path_t path )
 {
-  const char  * key;
-  config_line_t * root;
+  free( path - 8 );
+}
 
-} config_find_t;
+/* -------------------------------------------------------------------------- */
 
+static config_status_t
+config_path_set_level( config_path_t path, int level )
+{
+  char * pch = path;
+  if (level)
+  {
+    while( level )
+    {
+      pch = strchr( pch, '.' );
+      if ( pch )
+      {
+        if (!(--level))
+        {
+          PATH_LENGTH( path ) = (int)(pch-path);
+          break;
+        }
+        else
+          pch++;
+      }
+      else if ( level == 1 )
+      {
+        break;
+      }
+      else
+        return CONFIG_INDENT_ERROR;
+    }
+  }
+  else
+    PATH_LENGTH( path ) = 0;
+
+  path[ PATH_LENGTH( path ) ] = 0;
+
+  return CONFIG_SUCCESS;
+}
+
+/* -------------------------------------------------------------------------- */
+
+static config_status_t
+config_path_join( config_path_t * path, const char * key, int k_len )
+{
+  config_path_t p;
+
+  if( PATH_LENGTH( *path ) + k_len + 2 < PATH_SIZE( *path ) )
+  {
+    p = config_path_new(
+          *path,
+          PATH_LENGTH(*path),
+          PATH_SIZE(*path) + CONFIG_INITIAL_PATH + k_len
+        );
+
+    if (!p)
+      return CONFIG_ALLOC_ERROR;
+
+
+    config_path_free( *path );
+    *path = p;
+  }
+  else
+    p = *path;
+
+  if ( PATH_LENGTH( p ) )
+  {
+    p[ PATH_LENGTH(p) ] = '.';
+    PATH_LENGTH(p)++;
+  }
+
+  strncpy( &p[ PATH_LENGTH(p) ], key, k_len );
+  PATH_LENGTH(p)+=k_len;
+  p[ PATH_LENGTH(p) ] = 0;
+
+  return CONFIG_SUCCESS;
+}
 
 /* static ------------------------------------------------------------------- */
 
@@ -58,628 +139,216 @@ typedef struct
  * @result CONFIG_SUCCESS or sconfig_tSyntaxError
  * */
 static config_status_t
-config_read_line( config_t self, char       * line,
-                 config_line_t ** l,
-                 list_t       stack )
+config_parse_line( char * buffer, config_line_t line, int * offset )
 {
-  /* printf ("<<< %s", line); */
-  int       i = strlen(line)-1; /* pointer to current indent counter */
-  char      * p = line;       /* line iterator */
-  char      * b = NULL;       /* pointer to begin of word */
-  char      save;         /* variable to save character */
-  config_line_t * node = NULL;
+  int    last_char = -1;
+  char * p    = buffer;
 
+  line->i_key     = -1;
+  line->l_key     =  0;
+  line->i_equal   = -1;
+  line->i_value   = -1;
+  line->l_value   =  0;
+  line->i_comment = -1;
+  line->l_comment =  0;
 
-  *l = calloc(1, sizeof(config_line_t));
-  list_append(self->lines, *l);
-
-  if (line[ i ] != '\n') return CONFIG_SYNTAX_ERROR;
-  line[ i ] = 0;
-  i = 0;
-
-  /* indent */
-  while ((*p == ' ' || *p == '\t') && *(p++)) (*l)->indent[SHIFT]++;
-
-
-
-  if (*p==0) return CONFIG_SUCCESS;
-
-  /* key */
-  b = p;
-  p += strcspn(b, ";:= ");
-
-  /* if first symbol after indent is a stop symbol(could not be space) */
-  if (b == p)
+  while (*p)
   {
-    /* we have line with command */
-    if (*p == ';')
+    *offset = (int) (p-buffer);
+
+    switch( *p )
     {
-      (*l)->comment = str_copy(b);
-      return CONFIG_SUCCESS;
-    } 
-    else
+      case '=':
+      case ':':
+        if( line->i_equal == -1 )
+        {
+          line->i_equal = *offset;
+          line->l_key   = last_char - line->i_key + 1;
+          if (*p == '=')
+            line->i_value = *offset+1;
+          last_char = -1;
+        }
+
+        break;
+
+      case ';':
+        line->i_comment = *offset;
+        line->l_comment = strlen(p);
+        p += line->l_comment-1;
+        break;
+
+
+      case ' ':
+      case '\t':
+      case '\n':
+        break;
+
+      default:
+        if (last_char == -1)
+        {
+          if (line->i_key == -1)
+            line->i_key = *offset;
+          else if (line->i_equal != -1 && buffer[ line->i_equal ] == ':')
+            return CONFIG_SYNTAX_ERROR;
+          else if (line->i_value != -1)
+            line->i_value = * offset;
+        }
+
+        last_char = *offset;
+    }
+
+    p++;
+  }
+
+
+  if (last_char != -1)
+  {
+    if ( line->i_equal == -1  )
+    {
+      *offset = last_char;
       return CONFIG_SYNTAX_ERROR;
-  }
-
-  /* find root node */
-
-  while (1)
-  {
-    if (!stack->count) break;
-
-    node = list_index(stack, stack->count-1);
-
-    if (node->indent[SHIFT] >= (*l)->indent[SHIFT])
-    {
-      list_remove_index(stack, stack->count-1);
-      node = NULL;
     }
-    else
-      break;
-  }
 
-  /* we have boundaries of key, so save it */
-  save = *p;
-  *p = 0;
-
-  if (node)
-  {
-    (*l)->key = str_printf("%s.%s", node->key, b);
-    (*l)->node_id = node->node_id;
-  }
-  else
-    (*l)->key = str_copy(b);
-
-  *p = save;
-
-  (*l)->indent[EQUAL] += strcspn(p, ":=");
-  p += (*l)->indent[EQUAL];
-
-  /* check if line is over */
-  if (*p == 0) return CONFIG_SYNTAX_ERROR;
-
-  save = *p;
-
-  p++;
-
-  while ((*p == ' ' || *p == '\t') && *(p++)) (*l)->indent[VALUE]++;
-
-  b = p;
-
-  p = strchr(b, ';');
-
-  /* save value */
-  if (save == '=')
-  {
-    if (p)
+    if ( line->i_value != -1 )
     {
-      i = 0;
-      save = *p;
-      *p = 0;
+      line->l_value = last_char - line->i_value + 1;
     }
-    (*l)->value = str_set((*l)->value, b);
-    (*l)->indent[COMNT] = str_chop((*l)->value);
-    if (p) *p = save;
   }
-  else
-  {
-    if(!p) return CONFIG_SUCCESS;
-    else if (p != b) return CONFIG_SYNTAX_ERROR;
-  }
-
-  if (p && *p == ';')
-  {
-    (*l)->comment = str_copy(p);
-  }
-
-
 
   return CONFIG_SUCCESS;
 }
 
-/* -------------------------------------------------------------------------- */
-
-/* get current root node. If node is not select, number of config lines will
- * be written into line
- * @param self config_t object
- * @param line pointer to line counter
- * @return pointer to line structure of root node or NULL if not found
- * */
-static config_line_t *
-config_get_root(config_t self, uint32_t * line )
-{
-  uint32_t i;
-  config_line_t  * root=NULL;
-
-  *line = 0;
-
-  for (i=0; i<self->lines->count; i++)
-  {
-    root = list_index(self->lines, i);
-
-    if (root->node_id == self->root && root->key)
-      break;
-    else
-      root=NULL;
-  }
-
-  *line = (root) ? i : 0;
-
-  return root;
-}
-
-/* -------------------------------------------------------------------------- */
-
-static config_line_t *
-_get_line_by_key(config_t self, const char * key, config_line_t ** o_root)
-{
-  uint32_t     i  = 0,
-           shift;
-
-  config_line_t * l = NULL,
-         * root = config_get_root(self, &i);
-
-  /* output root */
-  if (o_root)
-    *o_root = root;
-
-  /*printf("\nLookup key: '%s', root=%s, size=%d\n", key, root ? root->key : "null", self->lines->count); */
-
-  for (i=(root)?i+1:0; i<self->lines->count; i++)
-  {
-    l = list_index( self->lines, i);
-
-    if (!l || !l->key)
-    {
-      l = NULL;
-      continue;
-    }
-
-    shift = 0;
-
-    if (root)
-    {
-      shift = strlen(root->key)+1;
-
-       /*printf(" Indents: root=%d line=%d\n", root->indent[0] & 0xFF, l->indent[0] & 0xFF);  */
-      if (root->indent[0] >= l->indent[0]) return NULL;
-       /*printf(" root indent is OK\n"); */
-    }
-    
-     /*printf("  compare with '%s'\n", l->key); */
-
-    if ((shift <= strlen(l->key)) && strcmp(&l->key[shift], key)==0)
-      break;
-    else
-      l=NULL;
-  }
-
-  /*printf("Return: %p\n", l); */
-  return l;
-}
-
-/* -------------------------------------------------------------------------- */
-
-/* find proper place to insert new node or key-value pair.
- * proper place is the end of node, or after last occurence of key in node
- * @param self config_t object
- * @param key  key text, NULL if key is not presented in config already
- * @param line pointer to line counter
- * @return indent
- * */
-uint8_t
-config_get_insert_position( config_t self, const char * key, uint32_t * line )
-{
-  uint8_t indent = 0;
-  config_line_t  * l, * root=NULL;
-
-  if (key)
-  {
-    l = _get_line_by_key(self, key, &root);
-    
-    /* if(l) printf("<< same key @ %d\n", *line); */
-
-    if (!l) key = NULL;
-  }
-  else
-    root = config_get_root(self, line);
-  
-  (*line)++;
-
-  if (root)
-  {
-    /*printf("<< root @ %d:%d\n", root->node_id, *line);*/
-    indent = root->indent[0]+4;
-  }
-
-  if (!key && !root)
-  {
-    *line = self->lines->count;
-    return 0;
-  }
-
-  /* need last occurance of this key */
-
-  uint32_t i, shift=0;
-
-  for (i=*line; i < self->lines->count; i++)
-  {
-    l = list_index(self->lines, i);
-
-    if (root)
-    {
-      /* end of parent node - right place */
-      if (l->indent[0] <= root->indent[0])
-        break;
-
-      shift = strlen(root->key)+1;
-    }
-    
-    if (key)
-    {
-      /*printf("compare %s and %s \n", &key[shift], find->key); */
-      if (strncmp (&l->key[shift], key, strlen(key)))
-        break;
-    }
-  }
-
-  if (!l) (*line)++;
-
-  return indent;
-}
-
-/* -------------------------------------------------------------------------- */
-
-/* free resources used by line structure
- * @param line pointer to config_line_t structure
- * */
-static void
-_free_line( config_line_t * line )
-{
-  if (line)
-  {
-    if (line->key)   free(line->key);
-    if (!line->do_not_unref)
-      if (line->value)   free(line->value);
-    if (line->comment) free(line->comment);
-    free(line);
-    *((void **)&line) = NULL;
-  }
-
-}
-
-
-/* implementation ----------------------------------------------------------- */
-
-
-config_t 
-config_new(const char * file)
-{
-  config_t self = calloc(1, sizeof(struct _config_t));
-
-  self->lines = list_new(32);
-
-  return self;
-}
-
-/* -------------------------------------------------------------------------- */
-
-void
-config_free(config_t self)
-{
-  if (self)
-  {
-    list_free(self->lines, (list_destructor_t)_free_line);
-    free(self);
-    *((void**) &self) = NULL;
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-
-uint32_t
-config_get_lines(config_t self)
-{
-  return self->lines->count;
-}
-
-
-/* read methods ------------------------------------------------------------- */
+/* parser ------------------------------------------------------------------- */
 
 config_status_t
-config_read(config_t self, const char * file)
+config_parse( const char               * filename,
+              config_on_get_node_t       on_get_node,
+              config_on_get_pair_t       on_get_pair,
+              config_on_syntax_error_t   on_syntax_error,
+              void                     * u_ptr)
 {
-  config_status_t   s = CONFIG_SUCCESS;
-  FILE            * fd;
-  char              line[ cMaxLength + 1 ];
-  list_t            stack = list_new(3);
+  FILE * f = fopen(filename, "r");
+  if (!f)
+    return CONFIG_FILE_ERROR;
 
-  config_line_t  * l;
+  config_status_t    result = CONFIG_SUCCESS;
 
-  fd = fopen(file, "r");
-  if (!fd) return CONFIG_FILE_ERROR;
+  struct config_line line;
+  config_path_t      path;
 
+  int                l_num  = 0,
+                     level  = 0,
+                     l      = 0,
+                     indent = 0, 
+                     offset;
 
-  while(fgets(line, cMaxLength, fd))
+  char             * buffer;
+
+  if ( (buffer = malloc( CONFIG_INITIAL_BUFFER )) != NULL )
   {
-    /* printf("read config line %s\n", line); */
-    s = config_read_line(self, line, &l, stack);
-
-    if (l->key && !l->value) /* new node */
+    if ( (path = config_path_new( NULL, 0, CONFIG_INITIAL_PATH )) != NULL )
     {
-      l->node_id = ++self->max_id;
-      list_append(stack, l);
+      /* read file line by line */
+      while(fgets(buffer, CONFIG_INITIAL_BUFFER, f))
+      {
+        l_num++;
+
+        /* parse line into struct config_line */
+        result = config_parse_line( buffer, &line, &offset );
+
+        if (result != CONFIG_SUCCESS) /* parser error at @offset character */
+        {
+          if (on_syntax_error)
+          {
+            if (on_syntax_error( l_num, offset, buffer, result, u_ptr))
+              continue;
+          }
+
+          break;
+        }
+
+        if (line.i_key == -1) continue; /* skip empty and comments */
+
+        /* indent form line begin, always equal to number of dots in path */
+        if (indent)
+        {
+          /* calculate level of current line */
+          l = line.i_key / indent;
+
+          if (l > level)
+          {
+            if (l - level > 1)
+            {
+              result = CONFIG_INDENT_ERROR;
+              if (on_syntax_error)
+              {
+                if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
+                  continue;
+              }
+              break;
+            }
+          }
+        }
+        else
+          indent = line.i_key;
+
+        if ((result = config_path_set_level( path, l )) != CONFIG_SUCCESS)
+        {
+          if (on_syntax_error)
+          {
+            if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
+              continue;
+            break;
+          }
+        }
+
+        result = config_path_join(&path, &buffer[ line.i_key ], line.l_key);
+
+        if (result != CONFIG_SUCCESS)
+        {
+          break;
+        }
+
+        if (line.i_value == -1) /* node */
+        {
+          level = l;
+          if (on_get_node)
+          {
+            if ( !on_get_node(l_num, path, u_ptr))
+            {
+              result = CONFIG_READ_NODE_ERROR;
+              break;
+            }
+          }
+        }
+        else
+        {
+          buffer[ line.i_value + line.l_value ] = 0;
+          
+          if (on_get_pair)
+          {
+            if (!on_get_pair(
+                  l_num, path, &buffer[line.i_value], line.l_value, u_ptr))
+            {
+              result = CONFIG_READ_PAIR_ERROR;
+              break;
+            }
+          }
+        }
+
+      } /* while (fgets(...)) */
+
+      config_path_free( path );
     }
+    else
+      result = CONFIG_ALLOC_ERROR;
 
-    /*
-    if (l)
-      printf(
-        "%d:\t%d\t%d\t%d\t%d\t%s = %s;\tc=%s\n",
-        l->node_id,
-        l->indent[0],
-        l->indent[1],
-        l->indent[2],
-        l->indent[3],
-        (l->key) ? l->key : "NULL",
-        (l->value) ? l->value : "NULL",
-        (l->comment) ? l->comment : "NULL"
-      );
-    */
-
-
-    if (s != CONFIG_SUCCESS)
-      break;
-  }
-  /*  printf("read finish\n"); */
-
-  fclose(fd);
-
-  list_free(stack, NULL);
-  self->root = 0;
-
-  return s;
-}
-
-/* -------------------------------------------------------------------------- */
-
-char *
-config_get_string(config_t self, const char * key)
-{
-  config_line_t * l = _get_line_by_key(self, key, NULL);
-
-  if (l && l->value)
-  {
-    l->do_not_unref = true;
-    return l->value;
+    free( buffer );
   }
   else
-    return NULL;
-}
-
-/* -------------------------------------------------------------------------- */
-
-const char *
-config_get_chars(config_t self, const char * key, const char * fb)
-{
-  config_line_t * l = _get_line_by_key(self, key, NULL);
-
-  return (l && l->value) ? (const char *) l->value : fb;
-}
-/* ToDO: not free resources */
-
-/* -------------------------------------------------------------------------- */
-
-int
-config_get_integer(config_t self, const char * key, int fb)
-{
-  int  result = 0;
-  const char * value = config_get_chars(self, key, "");
-
-  result = strtol(value, NULL, 10);
-  if (!result && strcmp(value, "0")) result = fb;
+    result = CONFIG_ALLOC_ERROR;
+  
+  fclose(f);
 
   return result;
 }
-
-/* -------------------------------------------------------------------------- */
-
-bool
-config_get_boolean(config_t self, const char * key, bool fb)
-{
-  const char * value = config_get_chars(
-      self, key, (fb) ? cConfigTrue : cConfigFalse
-  );
-
-  return (strcmp(value, cConfigTrue)==0) ? true : false;
-}
-
-/* -------------------------------------------------------------------------- */
-
-bool
-config_set_root(config_t self, const char * root)
-{
-  if (!root)
-  {
-    self->root=0;
-    return true;
-  }
-
-  if (*root == '.')
-    root++;
-  else
-    self->root=0;
-  
-  config_line_t  * l = _get_line_by_key(self, root, NULL);
-
-  if (l)
-  {
-    self->root = l->node_id;
-    return true;
-  }
-  else
-    return false;
-  
-}
-
-
-/* write methods ------------------------------------------------------------ */
-
-config_status_t
-config_write(config_t self, const char * file)
-{
-  FILE      * fd;
-  char      line[ cMaxLength + 1 ];
-  char      * p;
-  char      * k;
-  int       i;
-  config_line_t * l;
-
-  fd = fopen(file, "w");
-  if (!fd) return CONFIG_FILE_ERROR;
-
-  for (i=0; i<self->lines->count; i++)
-  {
-    p = line;
-
-    l = list_index(self->lines, i);
-
-    memset(p, ' ', l->indent[0]);
-    p += l->indent[0];
-
-    if (l->key)
-    {
-      k = strrchr(l->key, '.');
-      k = (!k) ? l->key : k+1;
-      strcpy(p, k);
-      p += strlen(k);
-
-      if (!l->value)
-      {
-        *(p++) = ':';
-      }
-      else
-      {
-        memset(p, ' ', l->indent[1]);
-        p += l->indent[1];
-        *(p++) = '=';
-      }
-      memset(p, ' ', l->indent[2]);
-      p += l->indent[2];
-
-      if (l->value)
-      {
-        if (l->value)
-          strcpy(p, l->value);
-        p += (l->value) ? strlen(l->value) : 0;
-      }
-    }
-
-    if (l->comment)
-    {
-      memset(p, ' ', l->indent[3]);
-      p += l->indent[3];
-      if (l->comment)
-        strcpy(p, l->comment);
-      p += (l->comment) ? strlen(l->comment) : 0;
-    }
-    *(p++) = '\n';
-    *(p)   = '\0';
-
-    fputs(line, fd);
-  }
-
-  fclose(fd);
-
-  return CONFIG_SUCCESS;
-}
-
-/* -------------------------------------------------------------------------- */
-
-void
-config_set_string(config_t self, const char * key, const char * value)
-{
-  config_line_t * root,
-         * l = _get_line_by_key(self, key, &root);
-
-  if (!l)
-  {
-    uint32_t       i=0;
-
-    config_get_insert_position(self, NULL, &i);
-
-    l = calloc(1, sizeof(config_line_t));
-    l->value = str_set(l->value, value);
-
-    if (root)
-    {
-      l->key = str_printf("%s.%s", root->key, key);
-      /*
-      l->key = string_new_with_size(
-         string_get(root->key),
-         string_get_length(root->key)+strlen(key)+1
-      );
-      string_append(l->key, ".");
-      string_append(l->key, key);
-      */
-      l->indent[0] = root->indent[0]+4;
-      l->node_id   = root->node_id;
-    }
-    else
-      l->key = str_set(l->key, key);
-
-    l->indent[1]=1;
-    l->indent[2]=1;
-    list_insert(self->lines, l, i);
-    //printf("<<< %s=%s @ %u:%u:%u\n", key, value, i, l->node_id, l->indent[0] & 0xFF);
-  }
-  else
-    l->value = str_set(l->value, value);
-
-}
-
-/* -------------------------------------------------------------------------- */
-
-void
-config_set_integer(config_t self, const char * key, int value)
-{
-  char buffer[10+1];
-
-  sprintf(buffer, "%d", value);
-
-  config_set_string(self, key, buffer);
-}
-
-/* -------------------------------------------------------------------------- */
-
-void
-config_set_boolean(config_t self, const char * key, bool value)
-{
-  config_set_string(self, key, (value)?cConfigTrue:cConfigFalse);
-}
-
-/* -------------------------------------------------------------------------- */
-
-/* node name has to be full name
- * new node will be set as current
- * */
-
-void
-config_add_node(config_t self, const char * name)
-{
-  config_line_t  * l = calloc(1, sizeof(config_line_t));
-  uint32_t       i=0;
-
-  l->indent[0] = config_get_insert_position(self, name, &i);
-
-  l->key = str_copy(name);
-  l->node_id = ++self->max_id;
-  l->indent[1] = 1;
-  l->indent[2] = l->indent[1];
-
-  list_insert(self->lines, l, i);
-
-  self->root = l->node_id;
-}
-
-
-/* -------------------------------------------------------------------------- */

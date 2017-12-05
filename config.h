@@ -1,198 +1,153 @@
-#ifndef _STANDARD_CONFIG_H_
-#define _STANDARD_CONFIG_H_
-
-#include <stdbool.h>
-
-/* TODO: add config_next_root() method to iterate nodes with same name */
-
-/* config_t class operates with configuration files with Löwenware syntax.
- * It allows both: to read and to write your settings to text files.
+/* config.h
  *
- * Löwenware config_turation Syntax:
- * 1. Comments. Everything that follow semicolon sign is a comment
- * 2. Nodes. Node defines group of parameters. Node name must begin from new
- *    line and colon sign must follow it
- * 3. Parameters and values. Must start from new line and end up on it. 
- *    Parameter should be splitted from value with equal sign.
- * 4. Indents are important. The define ownership of parameters and values to
- *    some node.
+ * # I/O module for Löwenware config format
+ *
+ * ## Syntax
+ *
+ * In general syntax is very similar to Python style, but even less strict.
+ *
+ * 1. Configuration always has tree structure with unnamed root node.
+ * 2. Named nodes must be defined with following colon sign.
+ * 3. Parameters and values are splited with = sign.
+ * 4. Everything written after semicolon sign is a comment.
+ * 5. Indents define nesting level
+ *
+ * ## Example
  *
  * ; + BEGIN EXAMPLE CONFIG ---------------------------------------------------
+ * 
  * name = default config
  * file = lw/config.h
- * example:                             ; this is node
- *     indent = 4                       ; indent for this node is 4 spaces
- *     aim = demonstrate config usage
- *     syntax = strict
- *     speed  = fast
- * ; + END EXAMPLE CONFIG ---------------------------------------------------
+ * example:                           ; this is node
+ *   indent = 4                       ; indent for this node is 2 spaces
+ *   aim    = demonstrate config usage
+ *   syntax = strict
+ *   speed  = fast
  *
- * Tips:
- * 1. Reading and Writing of config will save indents and comments
- * 2. Do not keep config_t instance in memory all the time. Use it to read
- *    settings, pass it to necessary components of your program and free used
- *    resources.
+ * ; + END EXAMPLE CONFIG ---------------------------------------------------
  *
  * */
 
-/* config macroses ---------------------------------------------------------- */
+#ifndef _CSTUFF_CONFIG_H_
+#define _CSTUFF_CONFIG_H_
 
-#define CONFIG_STRING( name, path, d_value ) \
-  const char cfg ## name ## Path[] = path; \
-  const char cfg ## name ## Default[] = d_value; \
-  char * cfg ## name = NULL;
+#include <stdbool.h>
 
-#define CONFIG_DEFINE( name, path, d_value, type ) \
-  const type cfg ## name ## Path[] = path; \
-  const type cfg ## name ## Default[] = d_value; \
-  type cfg ## name = d_value;
+/* macro settings ----------------------------------------------------------- */
 
-#define CONFIG_SET_DEFAULT( name ) \
-  cfg ## name = (typeof( cfg ## name) ) cfg ## name ## Default;
+#ifndef CONFIG_INITIAL_PATH
+#define CONFIG_INITIAL_PATH 32
+#endif
 
-#define CONFIG_FREE( name ) \
-  if (cfg ## name && ((void*) cfg ## name != (void*) cfg ## name ## Default)){ \
-    free( cfg ## name ); \
-    cfg ## name = NULL; \
+#ifndef CONFIG_INITIAL_BUFFER
+#define CONFIG_INITIAL_BUFFER 82
+#endif
+
+/* macro helpres ------------------------------------------------------------ */
+
+#define CONFIG_STRING( NAME, PATH, D_VALUE ) \
+  const char NAME##Path[] = PATH; \
+  const char NAME##Default[] = D_VALUE; \
+  char * NAME = NULL;
+
+#define CONFIG_DEFINE( NAME, PATH, D_VALUE, TYPE ) \
+  const char NAME##Path[] = PATH; \
+  const TYPE NAME##Default = D_VALUE; \
+  TYPE NAME = D_VALUE;
+
+#define CONFIG_SET_DEFAULT( NAME ) \
+  NAME = (typeof(NAME) ) NAME##Default;
+
+#define CONFIG_FREE( NAME ) \
+  if ( NAME && ((void*) NAME != (void*) NAME##Default)){ \
+    free( NAME ); \
+    NAME = NULL; \
   }
 
 /* -------------------------------------------------------------------------- */
 
-typedef struct _config_t * config_t;
-
 typedef enum {
 
-  CONFIG_SUCCESS,
-  CONFIG_FILE_ERROR,
-  CONFIG_SYNTAX_ERROR
+  CONFIG_ALLOC_ERROR     = -6,
+  CONFIG_FILE_ERROR      = -5,
+  CONFIG_INDENT_ERROR    = -4,
+  CONFIG_READ_PAIR_ERROR = -3,
+  CONFIG_READ_NODE_ERROR = -2,
+  CONFIG_SYNTAX_ERROR    = -1,
+
+  CONFIG_SUCCESS         = 0
 
 } config_status_t;
 
+/* -------------------------------------------------------------------------- */
 
-/* create new empty instance of config_t
- * @return new config_t object
+/* This feature is an ideal solution for configuration importing into 
+ * application due to its simplicity and low resource usage.
  * */
-config_t
-config_new();
 
-
-/* free resources used by config_t object
- * @param self config_t object
+/* Function being called on reading of each configuration node. Could be useful
+ * in case if you need to import several nodes with same name, i.e. 
+ * configuration for number of instances or something like that
+ *
+ * @line   : if not null, actual number of node line will be wrtiten by this 
+ *           pointer
+ * @node   : text representation of node
+ * @result : true if parser can continue, false if must stop
  * */
-void
-config_free(config_t self);
+typedef bool
+(* config_on_get_node_t)( int          line_number,
+                          const char * node,
+                          void       * u_ptr );
 
-
-/* get line number. can be used it in case of read error
- * @param self config_t object
- * @return line number
+/* Function being called on parameter pair (key => value) import.
+ *
+ * @line   : if not null, actual number of node line will be wrtiten by this 
+ *           pointer
+ * @key    : full configuration key, including parent nodes splitted by dot
+ * @value  : always null-terminated parameter value, can not be NULL
+ * @v_len  : length of value, being passed because it is known, to avoid
+ *           unnecessary further strlen calls
+ * @result : true if parser can continue, false if must stop
  * */
-uint32_t
-config_get_lines(config_t self);
+typedef bool
+(* config_on_get_pair_t)( int          line_number,
+                          const char * key,
+                          const char * value,
+                          int          v_len,
+                          void       * u_ptr );
 
-
-/* read methods ------------------------------------------------------------- */
-
-/* read configuration from file
- * @param self config_t object
- * @param file null-terminated string with path to file
- * @return lwSuccess or lwReadFileError
+/* Function being called on synatx error detection
+ *
+ * @line      : if not null, actual number of node line will be wrtiten by this 
+ *              pointer
+ * @row_text  : row text caused an error 
+ * @err_code  : error code
+ * @character : character offset in row
+ * @result    : true if parser can continue, false if must stop
  * */
-config_status_t
-config_read(config_t self, const char * file);
+typedef bool
+(* config_on_syntax_error_t)( int               line_number,
+                              int               char_number,
+                              const char      * line_text,
+                              config_status_t   err_code,
+                              void            * u_ptr);
 
-
-/* get param as a string (caller must free result using ws_string_free)
- * @param self config_t object
- * @param key null-terminated string with key name
- * @return null-terminated string with value
- * */
-char *
-config_get_string(config_t self, const char * key);
-
-/* get param as a chars
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param fb null-terminated string with fallback value
- * @return null-terminated string with value
- * */
-const char *
-config_get_chars(config_t self, const char * key, const char * fb);
-
-
-/* get param as an integer
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param fb fallback value
- * @return key value
- * */
-int
-config_get_integer(config_t self, const char * key, int fb);
-
-
-/* get param as boolean
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param fb fallback value
- * @return key value
- * */
-bool
-config_get_boolean(config_t self, const char * key, bool fb);
-
-
-/* change root to some child node. if same node requested, function works as 
- * an iterator. Use relative keys to access settings
- * @param self config_t object
- * @param key null-terminated string with node name, NULL for top level
- * @return true if node exists or false
- * */
-bool
-config_set_root(config_t self, const char * root);
-
-/* write methods ------------------------------------------------------------ */
-
-/* write configuration to file
- * @param self config_t object
- * @param file null-terminated string with path to file
- * @return lwSuccess or lwWriteFileError
+/* Reads file defined by filename, parses its syntax and call functions
+ * passed as arguments.
+ * @filename        : path to configuration file
+ * @on_read_node    : read node callback
+ * @on_read_node    : read pair callback
+ * @on_syntax_error : syntax error callback
+ * @result          : parser result
  * */
 config_status_t
-config_write(config_t self, const char * file);
+config_parse( const char                * filename,
+              config_on_get_node_t        on_get_node,
+              config_on_get_pair_t        on_get_pair,
+              config_on_syntax_error_t    on_syntax_error,
+              void                      * u_ptr );
 
 
-/* set key value
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param value null-terminated string with key value
- * */
-void
-config_set_string(config_t self, const char * key, const char * value);
-
-
-/* set key value
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param value key value
- * */
-void
-config_set_integer(config_t self, const char * key, int value);
-
-
-/* set key value
- * @param self config_t object
- * @param key null-terminated string with key name
- * @param value key value
- * */
-void
-config_set_boolean(config_t self, const char * key, bool value);
-
-
-/* add node to config
- * @param self config_t object
- * @param name null-terminated string with node name
- * */
-void
-config_add_node(config_t self, const char * name);
-
+/* -------------------------------------------------------------------------- */
 
 #endif

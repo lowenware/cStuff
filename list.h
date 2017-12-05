@@ -74,7 +74,7 @@ list_free(list_t self, list_destructor_t destructor);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_INSERT
+#ifdef CSTUFF_LIST_WITH_INSERT
 
 /* insert new item into list at some position, 
  * memory will be allocated if necessary
@@ -89,7 +89,7 @@ list_insert( list_t self, void * item, uint32_t position );
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_APPEND
+#ifdef CSTUFF_LIST_WITH_APPEND
 
 /* append item to queue list
  * @self   : list_t object
@@ -103,7 +103,7 @@ list_append(list_t self, void * item);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_REMOVE
+#ifdef CSTUFF_LIST_WITH_REMOVE
 
 /* remove pointer from list
  * @self : list_t object
@@ -116,7 +116,7 @@ list_remove( list_t self, void * item );
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_REMOVE_INDEX
+#ifdef CSTUFF_LIST_WITH_REMOVE_INDEX
 
 /* remove pointer from list by index
  * @self  : list_t object
@@ -129,7 +129,7 @@ list_remove_index( list_t self, uint32_t index );
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_SET_ITEM
+#ifdef CSTUFF_LIST_WITH_SET_ITEM
 
 /* set pointer by index. if element does not exist, list won't be extended
  * @self  : list_t object

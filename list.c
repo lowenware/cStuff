@@ -63,7 +63,7 @@ list_free(list_t self, list_destructor_t destructor)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_INSERT
+#ifdef CSTUFF_LIST_WITH_INSERT
 
 void
 list_insert( list_t self, void * item, uint32_t     position )
@@ -111,7 +111,7 @@ list_insert( list_t self, void * item, uint32_t     position )
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_APPEND
+#ifdef CSTUFF_LIST_WITH_APPEND
 
 uint32_t
 list_append(list_t self, void * item)
@@ -139,7 +139,7 @@ list_append(list_t self, void * item)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_REMOVE
+#ifdef CSTUFF_LIST_WITH_REMOVE
 
 void
 list_remove( list_t self, void * item )
@@ -161,7 +161,7 @@ list_remove( list_t self, void * item )
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_REMOVE_INDEX
+#ifdef CSTUFF_LIST_WITH_REMOVE_INDEX
 
 void *
 list_remove_index( list_t self, uint32_t index )
@@ -190,7 +190,7 @@ list_remove_index( list_t self, uint32_t index )
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef LIST_WITH_SET_ITEM
+#ifdef CSTUFF_LIST_WITH_SET_ITEM
 
 void
 list_set_item(list_t self, uint32_t index, void * value)
