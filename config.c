@@ -41,6 +41,7 @@ config_path_new( char * data, int d_len, int d_size )
     if (data)
       strncpy( path, data, d_len );
   }
+  path[d_len] = 0;
 
   return path;
 }
@@ -270,27 +271,25 @@ config_parse( const char               * filename,
         if (line.i_key == -1) continue; /* skip empty and comments */
 
         /* indent form line begin, always equal to number of dots in path */
-        if (indent)
-        {
-          /* calculate level of current line */
-          l = line.i_key / indent;
+        if (!indent)
+          indent = line.i_key;
 
-          if (l > level)
+        l = (indent) ? line.i_key / indent : 0;
+
+        if (l > level)
+        {
+          if (l - level > 1)
           {
-            if (l - level > 1)
+            result = CONFIG_INDENT_ERROR;
+            if (on_syntax_error)
             {
-              result = CONFIG_INDENT_ERROR;
-              if (on_syntax_error)
-              {
-                if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
-                  continue;
-              }
-              break;
+              if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
+                continue;
             }
+            break;
           }
         }
-        else
-          indent = line.i_key;
+
 
         if ((result = config_path_set_level( path, l )) != CONFIG_SUCCESS)
         {
@@ -352,3 +351,26 @@ config_parse( const char               * filename,
 
   return result;
 }
+
+/* -------------------------------------------------------------------------- */
+
+const char*
+config_status_get_text( config_status_t status )
+{
+  switch(status)
+  {
+    case CONFIG_ALLOC_ERROR:     return "memory allocation error";
+    case CONFIG_FILE_ERROR:      return "file i/o error";
+    case CONFIG_INDENT_ERROR:    return "indent error";
+    case CONFIG_READ_PAIR_ERROR: return "pair error";
+    case CONFIG_READ_NODE_ERROR: return "node error";
+    case CONFIG_SYNTAX_ERROR:    return "syntax error";
+
+    case CONFIG_SUCCESS:
+      return "success";
+  }
+
+  return "unknown";
+}
+
+/* -------------------------------------------------------------------------- */

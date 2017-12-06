@@ -64,7 +64,7 @@ log_printf(log_t self, log_level_t level, const char * format, ... );
 void
 log_vprintf(log_t self, log_level_t level, const char * format, va_list arg);
 
-#ifdef LOG_WITH_STDLOG
+#ifdef CSTUFF_LOG_WITH_STDLOG
 
 #define log_error(...) log_printf(stdlog, LOG_ERROR, __VA_ARGS__)
 #define log_alert(...) log_printf(stdlog, LOG_ALERT, __VA_ARGS__)

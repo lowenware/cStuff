@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
   
-#include "str_utils.h"
+#include "str-utils.h"
 
 /* -------------------------------------------------------------------------- */
 

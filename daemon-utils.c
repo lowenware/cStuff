@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <signal.h>
+#include <pwd.h>
 
-#include "daemon_utils.h"
+#include "daemon-utils.h"
 
 static char pidbuf[ CSTUFF_PID_BUFFER_SIZE ];
 
@@ -31,7 +34,7 @@ daemon_pid_read( const char * pidFile )
 pid_t
 daemon_pid_write( const char * pidFile, pid_t pid )
 {
-  if (! (pid_t > 0) ) pid = getpid();
+  if (! (pid > 0) ) pid = getpid();
 
   FILE * f = fopen(pidFile, "w");
 
@@ -44,3 +47,38 @@ daemon_pid_write( const char * pidFile, pid_t pid )
 }
 
 /* -------------------------------------------------------------------------- */
+
+int
+daemon_set_user( const char * user_name )
+{
+  struct passwd * pw = getpwnam( user_name );
+  if (pw)
+  {
+    return setuid(pw->pw_uid);
+  }
+  else
+    return -1;
+}
+
+/* -------------------------------------------------------------------------- */
+
+pid_t
+daemon_pid_check( const char * pidFile )
+{
+  pid_t result;
+
+  if ( access( pidFile, F_OK) != -1)
+  {
+    result = daemon_pid_read( pidFile );
+
+    if (kill(result, 0) == -1 && errno != EPERM)
+      result = 0;
+  }
+  else
+    result = 0;
+  
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
+

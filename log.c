@@ -4,9 +4,9 @@
 #include <time.h>
 
 #include "log.h"
-#include "str_utils.h"
+#include "str-utils.h"
 
-#ifdef LOG_WITH_STDLOG
+#ifdef CSTUFF_LOG_WITH_STDLOG
 
 log_t stdlog = NULL;
 
