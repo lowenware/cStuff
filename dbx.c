@@ -355,7 +355,7 @@ dbx_format_query( const char      *sql_format,
 
 
   /* make string */
-  sql = calloc(t, sizeof(char));
+  sql = calloc((size_t)t &0xFFFF, sizeof(char));
   char * sql_p = sql;
 
   for ( i=0; i < l; i++ )

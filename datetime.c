@@ -98,7 +98,7 @@ datetime_to_string( datetime_t    *dt,
   if (!dtstr)
     dtstr = malloc(DATETIME_STRING_SIZE+1);
 
-  char usec[1+6+1];
+  char usec[20];
 
   struct tm * tm = (tz==DATETIME_LOCAL) ? localtime(&dt->sec):gmtime(&dt->sec);
 
