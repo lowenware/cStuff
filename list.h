@@ -83,7 +83,7 @@ list_free(list_t self, list_destructor_t destructor);
  * @position : number from 0(prepend) to list size (append)
  * */
 int
-list_insert( list_t self, void * item, uint32_t position );
+list_insert( list_t self, void * item, int position );
 
 #endif
 
