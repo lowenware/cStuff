@@ -73,9 +73,6 @@ list_free(list_t self, list_destructor_t destructor)
 int
 list_insert( list_t self, void * item, int position )
 {
-  void     ** new_list;
-  int         new_size = self->count + 1;
-
   if (position >= self->count)
     return list_append(self, item);
   else if (position < 0)
