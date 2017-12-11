@@ -31,11 +31,16 @@
 list_t
 list_new(uint32_t   size)
 {
-  list_t self = calloc(1, sizeof(struct _list_t));
-  if (size)
+  list_t self = calloc(1, sizeof(struct list));
+  if (self && size)
   {
-    self->list = calloc(size, sizeof(void *));
-    self->size = size;
+    if ( (self->list = calloc(size, sizeof(void *))) == NULL )
+    {
+      free(self);
+      self = NULL;
+    }
+    else
+      self->size = size;
   }
   return self;
 }
@@ -65,45 +70,29 @@ list_free(list_t self, list_destructor_t destructor)
 
 #ifdef CSTUFF_LIST_WITH_INSERT
 
-void
-list_insert( list_t self, void * item, uint32_t     position )
+int
+list_insert( list_t self, void * item, int position )
 {
-  void     **list;
+  void     ** new_list;
+  int         new_size = self->count + 1;
 
-  if (position > self->count) position = self->count;
+  if (position >= self->count)
+    return list_append(self, item);
+  else if (position < 0)
+    position = 0;
 
-  if (self->count+1 > self->size)
-  {
-    self->size++;
-    list = self->list;
-    self->list = calloc(self->size, sizeof(void *));
+  if (list_append(self, NULL) == -1)
+    return -1;
 
-    if (list)
-    {
-      if (position > 0)
-      {
-        memcpy(self->list, list, position*sizeof(void *));
-      }
+  memmove(
+    &self->list[position],
+    &self->list[position+1], 
+    self->count - position - 1 
+  );
 
-      if (position < self->count)
-      {
-        memcpy(
-          &self->list[position+1],
-          &list[position],
-          (self->count-position)*sizeof(void*)
-        );
-      }
+  self->list[position] = item;
 
-      free(list);
-    }
-  }
-  else
-    list = self->list;
-
-  self->count++;
-
-  self->list[position]=item;
-
+  return position;
 }
 
 
@@ -113,21 +102,21 @@ list_insert( list_t self, void * item, uint32_t     position )
 
 #ifdef CSTUFF_LIST_WITH_APPEND
 
-uint32_t
+int
 list_append(list_t self, void * item)
 {
-  if (self->count+1 > self->size)
+  void ** new_list;
+  int     new_size = self->count+1;
+
+
+  if (new_size > self->size)
   {
-    void * * list = self->list;
+    if ( (new_list = realloc( self->list, new_size )) == NULL )
+      return -1;
 
-    self->list = calloc(++self->size, sizeof(void *));
 
-    if (list)
-    {
-      if (self->count)
-        memcpy(self->list, list, self->count*sizeof(void *));
-      free(list);
-    }
+    self->list = new_list;
+    self->size = new_size;
   }
 
   self->list[self->count]=item;

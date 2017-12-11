@@ -31,14 +31,14 @@
 
 /* structure ---------------------------------------------------------------- */
 
-struct _list_t
+struct list
 {
-    void     **list;  /* list itself */
-    uint32_t   size;  /* number of bytes allocated for list */
-    uint32_t   count; /* number of defined items in list */
+    void **list;  /* list itself */
+    int    size;  /* number of bytes allocated for list */
+    int    count; /* number of defined items in list */
 };
 
-typedef struct _list_t * list_t;
+typedef struct list * list_t;
 
 /* callback to free memory used by stored item ------------------------------ */
 
@@ -82,7 +82,7 @@ list_free(list_t self, list_destructor_t destructor);
  * @item     : pointer to be inserted
  * @position : number from 0(prepend) to list size (append)
  * */
-void
+int
 list_insert( list_t self, void * item, uint32_t position );
 
 #endif
@@ -96,7 +96,7 @@ list_insert( list_t self, void * item, uint32_t position );
  * @item   : pointer to be appended
  * @result : position at which pointer was stored
  * */
-uint32_t
+int
 list_append(list_t self, void * item);
 
 #endif
