@@ -66,6 +66,14 @@
 
 /* -------------------------------------------------------------------------- */
 
+#ifdef DEBUG
+  #define CONFIG_LOG( ... ) fprintf( stdout, __VA_ARGS__ )
+#else
+  #define CONFIG_LOG( ... ) log_state( __VA_ARGS__ )
+#endif
+
+/* -------------------------------------------------------------------------- */
+
 typedef enum {
 
   CONFIG_ALLOC_ERROR     = -6,
