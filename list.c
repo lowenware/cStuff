@@ -58,7 +58,6 @@ list_free(list_t self, list_destructor_t destructor)
   {
     if (self->list)
     {
-      printf("list_free(%d)\n", self->count);
       if (destructor)
       {
         for(i=0; i<self->count; i++)
