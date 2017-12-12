@@ -323,7 +323,7 @@ templight_new(const char * name, const char * root)
   }
 
   /* init object */
-  self = malloc(sizeof(struct _templight_t));
+  self = malloc(sizeof(struct templight));
 
   self->name     = str_copy(name);
   self->nodes    = NULL;
@@ -407,7 +407,7 @@ templight_clone(templight_t self)
   node_t n;
   pair_t p;
   
-  templight_t clone = malloc(sizeof(struct _templight_t));
+  templight_t clone = malloc(sizeof(struct templight));
 
   clone->name     = str_copy(self->name);
   clone->c_length = self->c_length;
