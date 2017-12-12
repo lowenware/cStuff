@@ -76,7 +76,7 @@ templight_set_vprintf( templight_t self, const char *var_name,
 /* Outputs templight
  * Result: void */
 
-uint32_t
+int
 templight_get_content_length(templight_t self);
 
 

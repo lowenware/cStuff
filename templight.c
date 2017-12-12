@@ -37,12 +37,15 @@ typedef struct _node_t * node_t;
 /* -------------------------------------------------------------------------- */
 
 static node_t
-node_new(node_type_t type, void * data, uint32_t size)
+node_new(node_type_t type, void * data, int size)
 {
   node_t self = malloc(sizeof(struct _node_t));
-  self->type = type;
-  self->data = data;
-  self->size = size;
+  if (self)
+  {
+    self->type = type;
+    self->data = data;
+    self->size = size;
+  }
 
   return self;
 }
@@ -52,6 +55,8 @@ node_new(node_type_t type, void * data, uint32_t size)
 static void
 node_free(node_t self)
 {
+  if (!self) return;
+
   if (self->data)
   {
     switch(self->type)
@@ -88,9 +93,11 @@ pair_new(const char * key, int k_len, void * node)
 {
   pair_t self = malloc(sizeof(struct _pair_t));
 
-  self->key  = str_ncopy(key, k_len);
-  self->node = node;
-
+  if (self)
+  {
+    self->key  = str_ncopy(key, k_len);
+    self->node = node;
+  }
   return self;
 }
 
@@ -99,6 +106,7 @@ pair_new(const char * key, int k_len, void * node)
 static void
 pair_free(pair_t self)
 {
+  if (!self) return;
   if(self->key)
     free(self->key);
   free(self);
@@ -112,7 +120,7 @@ struct _templight_t
 
   list_t       nodes;
   list_t       pairs;
-  uint32_t     c_length;  /* content length */
+  int     c_length;  /* content length */
 };
 
 
@@ -443,7 +451,7 @@ templight_new_block(templight_t self, const char * block)
 {
   if (!self || !self->pairs) return NULL;
 
-  uint32_t i;
+  int i;
 
 
 
@@ -497,7 +505,7 @@ _set_value(templight_t self, const char *var_name, char *value)
 
   if (!self->pairs) return 0;
 
-  uint32_t i, r = 0, l=strlen(value);
+  int i, r = 0, l=strlen(value);
 
   for(i=0; i<self->pairs->count; i++)
   {
@@ -601,7 +609,7 @@ templight_set_block(templight_t self, const char *var_name, templight_t value)
 {
   if (!self || !var_name) return 0;
 
-  uint32_t i, r = 0;
+  int i, r = 0;
   pair_t   p;
 
   for(i=0; i<self->pairs->count; i++)
@@ -646,7 +654,8 @@ templight_to_stream(templight_t self, aisl_stream_t s)
 
   for ( i=0; i<self->nodes->count; i++)
   {
-    n = list_index(self->nodes, i);
+    if ( (n = list_index(self->nodes, i))==NULL)
+      continue;
 
     switch (n->type)
     {
@@ -670,11 +679,11 @@ templight_to_stream(templight_t self, aisl_stream_t s)
 
 /* -------------------------------------------------------------------------- */
 
-uint32_t
+int
 templight_get_content_length(templight_t self)
 {
   if (!self) return 0;
-  uint32_t c_length = self->c_length,
+  int c_length = self->c_length,
            i;
   node_t   node;
 

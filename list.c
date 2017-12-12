@@ -29,7 +29,7 @@
 /* -------------------------------------------------------------------------- */
 
 list_t
-list_new(uint32_t   size)
+list_new(int   size)
 {
   list_t self = calloc(1, sizeof(struct list));
   if (self && size)
@@ -50,11 +50,12 @@ list_new(uint32_t   size)
 void
 list_free(list_t self, list_destructor_t destructor)
 {
-  uint32_t i;
+  int i;
   if (self)
   {
     if (self->list)
     {
+      printf("list_free(%d)\n", self->count);
       for(i=0; i<self->count; i++)
       {
         if (destructor && self->list[i])
@@ -130,7 +131,7 @@ list_append(list_t self, void * item)
 void
 list_remove( list_t self, void * item )
 {
-  uint32_t i;
+  int i;
 
   for (i=0; i<self->count; i++)
   {
@@ -150,10 +151,10 @@ list_remove( list_t self, void * item )
 #ifdef CSTUFF_LIST_WITH_REMOVE_INDEX
 
 void *
-list_remove_index( list_t self, uint32_t index )
+list_remove_index( list_t self, int index )
 {
   void * result;
-  uint32_t i;
+  int i;
 
   if (index < self->count)
   {
@@ -179,7 +180,7 @@ list_remove_index( list_t self, uint32_t index )
 #ifdef CSTUFF_LIST_WITH_SET_ITEM
 
 void
-list_set_item(list_t self, uint32_t index, void * value)
+list_set_item(list_t self, int index, void * value)
 {
   if (self->size > index)
   {
