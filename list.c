@@ -108,7 +108,7 @@ list_append(list_t self, void * item)
 
   if (new_size > self->size)
   {
-    if ( (new_list = realloc( self->list, new_size )) == NULL )
+    if ( (new_list = realloc( self->list, new_size*sizeof(void*) )) == NULL )
       return -1;
 
 
