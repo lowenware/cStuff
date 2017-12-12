@@ -85,11 +85,13 @@ list_insert( list_t self, void * item, int position )
   if ( (r = list_append(self, item)) == -1)
     return -1;
 
-  if (position >= self->count || position < 0)
+  if (position >= r || position < 0)
     return r;
 
   memmove(
-    &self->list[position], &self->list[position+1], self->count - position
+    &self->list[position+1],
+    &self->list[position],
+    (self->count-position-1)*sizeof(void*)
   );
 
   self->list[position] = item;
