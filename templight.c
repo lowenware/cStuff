@@ -676,16 +676,16 @@ templight_get_content_length(templight_t self)
   if (!self) return 0;
   uint32_t c_length = self->c_length,
            i;
+  node_t   node;
 
   if (self->nodes)
   {
     for (i=0; i<self->nodes->count; i++)
     {
-      if ( (((node_t)list_index(self->nodes, i))->type == BLOCK_NODE) &&
-           (((node_t)list_index(self->nodes, i))->size == -1) )
-        c_length += templight_get_content_length(
-          (templight_t) ((node_t)list_index(self->nodes, i))->data
-        );
+      if ((node = list_index(self->nodes, i))==NULL) continue;
+
+      if ( (node->type == BLOCK_NODE) && (node->size == -1) && node->data)
+        c_length += templight_get_content_length( (templight_t) node->data );
     }
   }
   
