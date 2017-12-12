@@ -60,7 +60,7 @@ typedef void (* list_destructor_t)(void * list_item);
  * @result new list_t instance
  * */
 list_t
-list_new(uint32_t size);
+list_new(int size);
 
 /* -------------------------------------------------------------------------- */
 
@@ -123,7 +123,7 @@ list_remove( list_t self, void * item );
  * @index : index of pointer to be removed
  * */
 void *
-list_remove_index( list_t self, uint32_t index );
+list_remove_index( list_t self, int index );
 
 #endif
 
@@ -137,7 +137,7 @@ list_remove_index( list_t self, uint32_t index );
  * @value : value to be set
  * */
 void
-list_set_item(list_t self, uint32_t index, void * value);
+list_set_item(list_t self, int index, void * value);
 
 #endif
 

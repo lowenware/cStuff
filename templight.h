@@ -6,7 +6,7 @@
 
 /* types -------------------------------------------------------------------- */
 
-typedef struct _templight_t * templight_t;
+typedef struct templight * templight_t;
 
 /* functions ---------------------------------------------------------------- */
 

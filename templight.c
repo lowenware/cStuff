@@ -25,21 +25,21 @@ typedef enum
 
 /* -------------------------------------------------------------------------- */
 
-struct _node_t
+struct node
 {
   void        *data;
   int          size;
   node_type_t  type;
 };
 
-typedef struct _node_t * node_t;
+typedef struct node * node_t;
 
 /* -------------------------------------------------------------------------- */
 
 static node_t
 node_new(node_type_t type, void * data, int size)
 {
-  node_t self = malloc(sizeof(struct _node_t));
+  node_t self = malloc(sizeof(struct node));
   if (self)
   {
     self->type = type;
@@ -78,25 +78,29 @@ node_free(node_t self)
 
 /* pair helpers ------------------------------------------------------------- */
 
-struct _pair_t
+struct pair
 {
   char   *key;
   node_t  node;
 };
 
-typedef struct _pair_t * pair_t;
+typedef struct pair * pair_t;
 
 /* -------------------------------------------------------------------------- */
 
 static pair_t
 pair_new(const char * key, int k_len, void * node)
 {
-  pair_t self = malloc(sizeof(struct _pair_t));
+  pair_t self = malloc(sizeof(struct pair));
 
   if (self)
   {
-    self->key  = str_ncopy(key, k_len);
     self->node = node;
+    if ( (self->key  = str_ncopy(key, k_len)) == NULL )
+    {
+      free(self);
+      self=NULL;
+    }
   }
   return self;
 }
@@ -114,13 +118,13 @@ pair_free(pair_t self)
 
 /* templight_t private ------------------------------------------------------ */
 
-struct _templight_t
+struct templight
 {
   const char * name;
 
   list_t       nodes;
   list_t       pairs;
-  int     c_length;  /* content length */
+  int          c_length;  /* content length */
 };
 
 
@@ -138,15 +142,18 @@ _print_error(const char * error, int line)
 static node_t
 _append_node(templight_t block, node_type_t n_type, void *n_data, int n_size)
 {
-  node_t node = node_new(n_type, n_data, n_size);
+  node_t node;
 
   if (!block->nodes)
-    block->nodes = list_new(1);
+    if ( (block->nodes = list_new(1))==NULL ) return NULL;
 
-  list_append(block->nodes, node);
+  if ( (node = node_new(n_type, n_data, n_size)) != NULL);
+  {
+    list_append(block->nodes, node);
 
-  if (n_type == PLAIN_NODE && n_data)
-    block->c_length += n_size;
+    if (n_type == PLAIN_NODE && n_data)
+      block->c_length += n_size;
+  }
 
   return node;
 }
@@ -156,12 +163,15 @@ _append_node(templight_t block, node_type_t n_type, void *n_data, int n_size)
 static pair_t
 _append_pair(templight_t block, const char * key, int length, node_t node)
 {
-  pair_t pair = pair_new(key, length, node);
-
+  pair_t pair;
+  
   if (!block->pairs)
-    block->pairs = list_new(1);
+    if ( (block->pairs = list_new(1)) == NULL) return NULL;
 
-  list_append(block->pairs, pair);
+  if ( (pair = pair_new(key, length, node)) != NULL )
+  {
+    list_append(block->pairs, pair);
+  }
 
   return pair;
 }
@@ -185,12 +195,18 @@ _new_block(char * block_name, int length)
       break;
   }
 
-  self = malloc(sizeof(struct _templight_t));
+  if ( (p = str_ncopy(block_name, length)) == NULL)
+  {
+    return NULL;
+  }
 
-  self->name     = str_ncopy(block_name, length);
-  self->nodes    = NULL;
-  self->pairs    = NULL;
-  self->c_length = 0;
+  if ( (self = malloc(sizeof(struct templight))) != NULL)
+  {
+    self->name     = p;
+    self->nodes    = NULL;
+    self->pairs    = NULL;
+    self->c_length = 0;
+  }
 
   return self;
 }

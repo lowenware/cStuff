@@ -32,15 +32,18 @@ list_t
 list_new(int   size)
 {
   list_t self = calloc(1, sizeof(struct list));
-  if (self && size)
+  if (self)
   {
-    if ( (self->list = calloc(size, sizeof(void *))) == NULL )
+    if (size)
     {
-      free(self);
-      self = NULL;
-    }
-    else
       self->size = size;
+
+      if ( (self->list = calloc(size, sizeof(void *))) == NULL )
+      {
+       free(self);
+       self = NULL;
+      }
+    }
   }
   return self;
 }
@@ -56,10 +59,13 @@ list_free(list_t self, list_destructor_t destructor)
     if (self->list)
     {
       printf("list_free(%d)\n", self->count);
-      for(i=0; i<self->count; i++)
+      if (destructor)
       {
-        if (destructor && self->list[i])
-          destructor(self->list[i]);
+        for(i=0; i<self->count; i++)
+        {
+          if (self->list[i])
+            destructor(self->list[i]);
+        }
       }
       free(self->list);
     }
@@ -74,18 +80,16 @@ list_free(list_t self, list_destructor_t destructor)
 int
 list_insert( list_t self, void * item, int position )
 {
-  if (position >= self->count)
-    return list_append(self, item);
-  else if (position < 0)
-    position = 0;
+  int r;
 
-  if (list_append(self, NULL) == -1)
+  if ( (r = list_append(self, item)) == -1)
     return -1;
 
+  if (position >= self->count || position < 0)
+    return r;
+
   memmove(
-    &self->list[position],
-    &self->list[position+1], 
-    self->count - position - 1 
+    &self->list[position], &self->list[position+1], self->count - position
   );
 
   self->list[position] = item;
