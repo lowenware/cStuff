@@ -145,11 +145,18 @@ _append_node(templight_t block, node_type_t n_type, void *n_data, int n_size)
   node_t node;
 
   if (!block->nodes)
-    if ( (block->nodes = list_new(1))==NULL ) return NULL;
-
-  if ( (node = node_new(n_type, n_data, n_size)) != NULL);
   {
-    list_append(block->nodes, node);
+    if ( (block->nodes = list_new(1))==NULL )
+      return NULL;
+  }
+
+  if ( (node = node_new(n_type, n_data, n_size)) != NULL)
+  {
+    if (list_append(block->nodes, node) == -1)
+    {
+      node_free(node);
+      return NULL;
+    }
 
     if (n_type == PLAIN_NODE && n_data)
       block->c_length += n_size;
@@ -166,11 +173,18 @@ _append_pair(templight_t block, const char * key, int length, node_t node)
   pair_t pair;
   
   if (!block->pairs)
-    if ( (block->pairs = list_new(1)) == NULL) return NULL;
+  {
+    if ( (block->pairs = list_new(1)) == NULL)
+      return NULL;
+  }
 
   if ( (pair = pair_new(key, length, node)) != NULL )
   {
-    list_append(block->pairs, pair);
+    if (list_append(block->pairs, pair) == -1)
+    {
+      pair_free(pair);
+      return NULL;
+    }
   }
 
   return pair;
@@ -207,6 +221,8 @@ _new_block(char * block_name, int length)
     self->pairs    = NULL;
     self->c_length = 0;
   }
+  else
+    free(p);
 
   return self;
 }
@@ -216,10 +232,12 @@ _new_block(char * block_name, int length)
 static int
 _parse_line(list_t stack, char * b, int line)
 {
-  templight_t    block;
+  templight_t    block, parent;
   char          *begin;
   char          *end;
   int            l;
+  node_t         node;
+  pair_t         pair;
 
   /* handle the end of block */
   begin = strstr(b, "{:end}");
@@ -241,20 +259,25 @@ _parse_line(list_t stack, char * b, int line)
     if (end && end > begin)
     {
       block = _new_block( begin, (int) (end-begin) );
+      if (block)
+      {
+        parent = (templight_t) list_index(stack, stack->count-1);
+        node = _append_node( parent, BLOCK_NODE, (void *) block, 0 );
 
-      _append_pair(
-        ((templight_t) list_index(stack, stack->count-1)),
-        begin, 
-        (int) (end-begin), 
-        _append_node(
-          ((templight_t) list_index(stack, stack->count-1)),
-          BLOCK_NODE,
-          (void *) block,
-          0
-        )
-      );
-      list_append(stack, (void*) block);
-      return 0;
+        if (node)
+        {
+          pair = _append_pair( parent, begin, (int) (end-begin), node);
+
+          if (pair)
+          {
+            if ( list_append(stack, (void*) block) != -1)
+            {
+              return 0;
+            }
+          }
+        }
+      }
+      return line;
     }
     else
       return _print_error("bad block name", line);
