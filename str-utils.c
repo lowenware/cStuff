@@ -28,10 +28,10 @@
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_SET
+#ifdef CSTUFF_STR_UTILS_WITH_SET
 
-#ifndef STR_UTILS_WITH_COPY
-#define STR_UTILS_WITH_COPY
+#ifndef CSTUFF_STR_UTILS_WITH_COPY
+#define CSTUFF_STR_UTILS_WITH_COPY
 #endif
 
 char *
@@ -66,7 +66,7 @@ str_set(char * init, const char * src)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_COPY
+#ifdef CSTUFF_STR_UTILS_WITH_COPY
 
 char *
 str_copy(const char * src)
@@ -86,7 +86,7 @@ str_copy(const char * src)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_NCOPY
+#ifdef CSTUFF_STR_UTILS_WITH_NCOPY
 
 char *
 str_ncopy(const char * src, uint32_t s)
@@ -106,10 +106,10 @@ str_ncopy(const char * src, uint32_t s)
 # endif
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_PRINTF
+#ifdef CSTUFF_STR_UTILS_WITH_PRINTF
 
-#ifndef STR_UTILS_WITH_VPRINTF
-#define STR_UTILS_WITH_VPRINTF
+#ifndef CSTUFF_STR_UTILS_WITH_VPRINTF
+#define CSTUFF_STR_UTILS_WITH_VPRINTF
 #endif
 
 char *
@@ -127,7 +127,7 @@ str_printf(const char * format,  ...)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_VPRINTF
+#ifdef CSTUFF_STR_UTILS_WITH_VPRINTF
 
 char *
 str_vprintf(const char * format,  va_list vl)
@@ -326,10 +326,10 @@ str_vprintf(const char * format,  va_list vl)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_CAT
+#ifdef CSTUFF_STR_UTILS_WITH_CAT
 
-#ifndef STR_UTILS_WITH_NCAT
-#define STR_UTILS_WITH_NCAT
+#ifndef CSTUFF_STR_UTILS_WITH_NCAT
+#define CSTUFF_STR_UTILS_WITH_NCAT
 #endif
 
 char *
@@ -342,12 +342,12 @@ str_cat(char * source, const char * target)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_NCAT
+#ifdef CSTUFF_STR_UTILS_WITH_NCAT
 
 char *
 str_ncat(char * source, const char * target, uint32_t length)
 {
-    char * result = malloc(
+    char * result = realloc( source, 
                          length + ((source) ? strlen(source) : 0) + 1
                       );
 
@@ -370,7 +370,7 @@ str_ncat(char * source, const char * target, uint32_t length)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_CMPI
+#ifdef CSTUFF_STR_UTILS_WITH_CMPI
 
 #include <ctype.h>
 
@@ -393,7 +393,7 @@ str_cmpi(const char * source, const char * target)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_TO_INTEGER
+#ifdef CSTUFF_STR_UTILS_WITH_TO_INTEGER
 
 uint64_t
 str_to_integer(const char * ptr, int l)
@@ -410,7 +410,7 @@ str_to_integer(const char * ptr, int l)
 #endif
 
 /* -------------------------------------------------------------------------- */
-#ifdef STR_UTILS_WITH_CHOP
+#ifdef CSTUFF_STR_UTILS_WITH_CHOP
 
 /* chop spaces from string, return number of prepending spaces */
 uint32_t

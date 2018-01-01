@@ -1,8 +1,13 @@
-#ifndef _LOWENWARE_TEMPLIGHT_H_
-#define _LOWENWARE_TEMPLIGHT_H_
+#ifndef _CSTUFF_TEMPLIGHT_H_
+#define _CSTUFF_TEMPLIGHT_H_
 
 #include <stdarg.h>
 #include <aisl/aisl.h>
+
+/* flags -------------------------------------------------------------------- */
+
+#define TEMPLIGHT_GREEDY    1
+#define TEMPLIGHT_MINIMIZE  1
 
 /* types -------------------------------------------------------------------- */
 
@@ -11,11 +16,11 @@ typedef struct templight * templight_t;
 /* functions ---------------------------------------------------------------- */
 
 /* Constructor
- * template_name - name of template file without .tpl.html
+ * name - name of template file without .tpl.html
  * root - absolute or relative path to templates folder
  * Result: a new instance of object */
-templight_t
-templight_new(const char * name, const char * root);
+int
+templight_new(templight_t * self, const char * name, const char * root);
 
 
 
@@ -24,7 +29,7 @@ templight_new(const char * name, const char * root);
  * Ignores content of LINK atoms
  * Result: NULL */
 void
-templight_free(templight_t self);
+templight_free(templight_t * self);
 
 
 const char *
@@ -34,14 +39,14 @@ templight_get_name(templight_t self);
 /* Clones template to new one
  * self - existing template
  * Result: new templight object with LINK atoms instead of PLAIN */
-templight_t
-templight_clone(templight_t self);
+int
+templight_clone(templight_t self, templight_t * clone);
 
 
 /* Repeates the sub block in atom
  * REsult: pointer to new block or NULL on fail */
-templight_t
-templight_new_block(templight_t self, const char * block);
+int
+templight_new_block(templight_t self, templight_t * block, const char * label);
 
 
 /* Composes one label inside block
@@ -79,13 +84,14 @@ templight_set_vprintf( templight_t self, const char *var_name,
 int
 templight_get_content_length(templight_t self);
 
+#ifdef CSTUFF_TEMPLIGHT_WITH_AISL
 
-void
+int
 templight_to_stream(templight_t self, aisl_stream_t s);
 
+#endif
 
-
-
-
+int
+templight_to_fstream(templight_t self, FILE * fstream);
 
 #endif

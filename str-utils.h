@@ -21,18 +21,18 @@
  *
  * */
 
-#ifndef _LOWESTD_STR_UTILS_H_
-#define _LOWESTD_STR_UTILS_H_
+#ifndef _CSTUFF_STR_UTILS_H_
+#define _CSTUFF_STR_UTILS_H_
 
 #include <stdint.h>
 #include <stdarg.h>
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_SET
+#ifdef CSTUFF_STR_UTILS_WITH_SET
 
-#ifndef STR_UTILS_WITH_COPY
-#define STR_UTILS_WITH_COPY
+#ifndef CSTUFF_STR_UTILS_WITH_COPY
+#define CSTUFF_STR_UTILS_WITH_COPY
 #endif
 
 /* set init string to src. 
@@ -47,7 +47,7 @@ str_set(char * init, const char * src);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_COPY
+#ifdef CSTUFF_STR_UTILS_WITH_COPY
 
 /* copy src string to newly allocated one
  * */
@@ -58,7 +58,7 @@ str_copy(const char * src);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_NCOPY
+#ifdef CSTUFF_STR_UTILS_WITH_NCOPY
 
 /* copy num bytes from src string to newly allocated one 
  * */
@@ -69,7 +69,7 @@ str_ncopy(const char * src, uint32_t num);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_PRINTF
+#ifdef CSTUFF_STR_UTILS_WITH_PRINTF
 
 char *
 str_printf(const char * format,  ...);
@@ -81,10 +81,10 @@ str_vprintf(const char * format,  va_list vl);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_CAT
+#ifdef CSTUFF_STR_UTILS_WITH_CAT
 
-#ifndef STR_UTILS_WITH_NCAT
-#define STR_UTILS_WITH_NCAT
+#ifndef CSTUFF_STR_UTILS_WITH_NCAT
+#define CSTUFF_STR_UTILS_WITH_NCAT
 #endif
 
 
@@ -96,7 +96,7 @@ str_cat(char * source, const char * target);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_NCAT
+#ifdef CSTUFF_STR_UTILS_WITH_NCAT
 
 /* for source will be called u_free automatically */
 char *
@@ -106,7 +106,7 @@ str_ncat(char * source, const char * target, uint32_t length);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_CMPI
+#ifdef CSTUFF_STR_UTILS_WITH_CMPI
 
 /* compare strings ignoring case */
 int
@@ -116,7 +116,7 @@ str_cmpi(const char * source, const char * target);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_TO_INTEGER
+#ifdef CSTUFF_STR_UTILS_WITH_TO_INTEGER
 
 uint64_t
 str_to_integer(const char * ptr, int l);
@@ -125,7 +125,7 @@ str_to_integer(const char * ptr, int l);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef STR_UTILS_WITH_CHOP
+#ifdef CSTUFF_STR_UTILS_WITH_CHOP
 
 /* chop spaces from string, return number of prepending spaces */
 uint32_t
