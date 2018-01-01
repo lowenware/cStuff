@@ -263,13 +263,12 @@ _parse(FILE * fd, list_t stack)
           cursor,
           mode = MACRO_SEEK;
 
-  char  * buffer,
-        * begin  = NULL,
-        * cursor = NULL;
+  char  * buffer;
 
   str_builder_t s_bldr;
 
-  templight_t    block = (templight_t) list_index(stack, stack->count-1);
+  templight_t    pr = (templight_t) list_index(stack, stack->count-1),
+                 bl;
 
   /* allocate resources */
 
@@ -303,6 +302,14 @@ _parse(FILE * fd, list_t stack)
         }
         else if (strncmp(&buffer[i], c_end, sizeof(c_end)-1 ) == 0)
         {
+          if (stack->count == 1)
+          {
+            /* return _print_error("closing of non-opened block", line); */
+            return CSTUFF_PARSE_ERROR;
+          }
+
+          list_remove_index(stack, stack->count-1);
+
           i += sizeof(c_end)-1;
         }
         else
