@@ -306,6 +306,14 @@ dbx_format_query( const char      *sql_format,
           sprintf(p[i].str, "'%s'", v_chars);
         break;
 
+      case DBX_STATEMENT:
+        v_chars = va_arg(arg, char *);
+        v_int = strlen(v_chars)+1;
+        p[i].str = malloc(v_int);
+        if (p[i].str)
+          sprintf(p[i].str, "%s", v_chars);
+        break;
+
       case DBX_STRING:
         v_chars = va_arg(arg, char *);
         
