@@ -1,3 +1,27 @@
+/* - templight.c --------------------------------------------------------------
+ *
+ * Copyright (c) 2017 Löwenware Ltd (https://lowenware.com)
+ *
+ * REPOSITORY:
+ *   https://github.com/lowenware.com:cStuff.git
+ * MAINTAINER:
+ *   Elias Löwe <elias@lowenware.com>
+ *
+ * LICENSE and DISCLAIMER:
+ *   All code stored in this repository is designed to solve
+ *   very common and widely meet development tasks. We are not about to patent
+ *   wheels here, so all code you can find in this repository is FREE:
+ *   you can use, redistribute and/or modify it without any limits or 
+ *   restrictions.
+ *
+ *   All code described above is distributed in hope to be useful for somebody 
+ *   else WITHOUT ANY WARRANTY, without even the implied warranty of 
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ *   In case of questions or suggestions, feel free to contact maintainer.
+ *
+ * -------------------------------------------------------------------------- */
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -6,6 +30,7 @@
 
 #include "list.h"
 #include "str-utils.h"
+#include "str-builder.h"
 #include "retcodes.h"
 
 #include "templight.h"
@@ -14,7 +39,7 @@
 #define TEMPLIGHT_BUFFER_SIZE 256
 #endif
 
-
+#define TEMPLIGHT_GREEDY      1
 /* types -------------------------------------------------------------------- */
 
 typedef enum
@@ -103,9 +128,9 @@ pair_new(const char * key, int k_len, void * node)
         free(self);
         self=NULL;
       }
-      else
-        self->key = NULL;
     }
+    else
+      self->key = NULL;
   }
   return self;
 }
@@ -130,6 +155,7 @@ struct templight
   list_t       nodes;
   list_t       pairs;
   int          c_length;  /* content length */
+  int          flags;
 };
 
 
@@ -153,11 +179,13 @@ _append_node(templight_t block, node_type_t n_type, void *n_data, int n_size)
 
   if (!block->nodes)
   {
-    if ( (block->nodes = list_new(1))==NULL )
+    if ( !(block->nodes = list_new(1)) )
       return NULL;
   }
 
-  if ( (node = node_new(n_type, n_data, n_size)) != NULL)
+  node = node_new(n_type, n_data, n_size);
+
+  if ( node )
   {
     if (list_append(block->nodes, node) == -1)
     {
@@ -181,7 +209,7 @@ _append_pair(templight_t block, char * key, node_t node)
   
   if (!block->pairs)
   {
-    if ( (block->pairs = list_new(1)) == NULL)
+    if ( !(block->pairs = list_new(1)) )
       return NULL;
   }
 
@@ -193,8 +221,9 @@ _append_pair(templight_t block, char * key, node_t node)
       return NULL;
     }
 
-    pair->key = key;
+    pair->key = key; /* key is already allocated by str-builder */
   }
+
 
   return pair;
 }
@@ -202,7 +231,7 @@ _append_pair(templight_t block, char * key, node_t node)
 /* -------------------------------------------------------------------------- */
 
 templight_t
-_new_block(char * block_name, int length)
+_new_block(char * block_name, int length, int flags)
 {
   templight_t self;
   char * p=&block_name[length-1];
@@ -229,6 +258,7 @@ _new_block(char * block_name, int length)
     self->nodes    = NULL;
     self->pairs    = NULL;
     self->c_length = 0;
+    self->flags    = flags;
   }
   else
     free(p);
@@ -261,7 +291,8 @@ _parse(FILE * fd, list_t stack)
           d_len = 0,
           l, i,
           cursor,
-          mode = MACRO_SEEK;
+          mode = MACRO_SEEK,
+          result;
 
   char  * buffer;
 
@@ -269,6 +300,9 @@ _parse(FILE * fd, list_t stack)
 
   templight_t    pr = (templight_t) list_index(stack, stack->count-1),
                  bl;
+
+  pair_t    pair;
+  node_t    node;
 
   /* allocate resources */
 
@@ -293,12 +327,12 @@ _parse(FILE * fd, list_t stack)
         if (strncmp(&buffer[i], c_begin_open, sizeof(c_begin_open)-1 ) == 0)
         {
           mode = MACRO_BEGIN;
-          i += sizeof(c_begin_open)-1;
+          l = sizeof(c_begin_open)-1;
         }
         else if (strncmp(&buffer[i], c_var_open, sizeof(c_var_open)-1)==0)
         {
           mode = MACRO_VAR;
-          i += sizeof(c_var_open)-1;
+          l = sizeof(c_var_open)-1;
         }
         else if (strncmp(&buffer[i], c_end, sizeof(c_end)-1 ) == 0)
         {
@@ -308,7 +342,18 @@ _parse(FILE * fd, list_t stack)
             return CSTUFF_PARSE_ERROR;
           }
 
+          /* close current plain node */
+          if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
+            goto e_malloc;
+          
+
+          if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
+            goto e_malloc;
+
+          memset( s_bldr, 0, sizeof( struct str_builder ) );
+
           list_remove_index(stack, stack->count-1);
+          pr = list_index(stack, stack->count-1);
 
           i += sizeof(c_end)-1;
         }
@@ -333,10 +378,13 @@ _parse(FILE * fd, list_t stack)
           if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
             goto e_malloc;
 
-          if (_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)==-1)
+
+          if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
             goto e_malloc;
 
           memset( s_bldr, 0, sizeof( struct str_builder ) );
+
+          i+=l; /* add length of macro */
         }
 
         /* move cursor */
@@ -350,25 +398,32 @@ _parse(FILE * fd, list_t stack)
           if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
             goto e_malloc;
 
-          if ( !(bl = _new_block( s_bldr->c_str, s_bldr->length )) )
+
+          if ( !(bl = _new_block( s_bldr->c_str, s_bldr->length, pr->flags )) )
             goto e_malloc;
 
           if ( !(node=_append_node( pr, BLOCK_NODE, (void *) bl, 0)) )
           {
-            block_free(bl);
+            templight_free(bl);
             goto e_malloc;
           }
 
           if ( !(pair=_append_pair( pr, s_bldr->c_str, node)) )
             goto e_malloc;
+          
+          memset( s_bldr, 0, sizeof( struct str_builder ) );
 
-          if ( list_append(stack, (void*) bl) != -1)
+          if ( list_append(stack, (void*) bl) == -1)
             goto e_malloc;
+
+          pr = bl;
 
           i += (sizeof(c_begin_close)-1);
         }
         else if ( d_len-i < sizeof(c_begin_close)-1 )
+        {
           break;  /* load more chars */
+        }
         else
           continue;
       }
@@ -376,28 +431,54 @@ _parse(FILE * fd, list_t stack)
       {
         if (strncmp(&buffer[i], c_var_close, sizeof(c_var_close)-1)==0)
         {
-          if ( !(node=_append_node(bl, VAR_NODE, NULL, 0)) )
+          if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
             goto e_malloc;
 
-          if ( !(_append_pair(bl, s_bldr->c_str, node)) )
+          if ( !(node=_append_node(pr, VAR_NODE, NULL, 0)) )
             goto e_malloc;
+
+          if ( !(_append_pair(pr, s_bldr->c_str, node)) )
+            goto e_malloc;
+
+          memset( s_bldr, 0, sizeof( struct str_builder ) );
 
           i += (sizeof(c_var_close)-1);
         }
         else if ( d_len-i < sizeof(c_var_close)-1 )
+        {
           break;  /* load more chars */
+        }
         else
           continue;
       }
 
       mode = MACRO_SEEK;
       cursor = i;
-      memset( s_bldr, 0, sizeof( struct str_builder ) );
 
     } /* end for */
 
-    if ( (d_len -= i) > 0 )
+    if ( cursor < i )
+    {
+      if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
+        goto e_malloc;
+
+      /* printf("PLAIN 2: %s\n", s_bldr->c_str);
+      if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
+        goto e_malloc; 
+
+      memset( s_bldr, 0, sizeof( struct str_builder ) );
+      */
+
+      cursor=i;
+    }
+    
+    if ((d_len -= i) > 0 )
+    {
+      mode = MACRO_SEEK;
       memmove( buffer, &buffer[i], d_len );
+      continue;
+    }
+
 
   } /* end while */
 
@@ -407,7 +488,7 @@ _parse(FILE * fd, list_t stack)
      if (str_builder_append_chars(s_bldr, &buffer[ cursor ], d_len)==-1)
         goto e_malloc;
 
-     if (_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)==-1)
+     if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
         goto e_malloc;
 
      memset( s_bldr, 0, sizeof( struct str_builder ) );
@@ -419,7 +500,7 @@ _parse(FILE * fd, list_t stack)
   {
      /*fprintf(stderr, "[templight] block is not closed %s\n", 
      ((templight_t) list_index(stack, stack->count-1))->name); */
-     ret = CSTUFF_PARSE_ERROR;
+     result = CSTUFF_PARSE_ERROR;
      goto e_malloc;
   }
 
@@ -431,7 +512,7 @@ e_malloc:
   result = CSTUFF_MALLOC_ERROR;
 
 release:
-  str_builder_free( s_bldr );
+  str_builder_free( s_bldr, 1 );
 
 release_buffer:
   free(buffer);
@@ -440,7 +521,7 @@ finally:
   return result;
 }
 
-
+/*
 int
 bak_parse_line(list_t stack, char * b, int line)
 {
@@ -451,13 +532,13 @@ bak_parse_line(list_t stack, char * b, int line)
   node_t         node;
   pair_t         pair;
 
-  /* handle the end of block */
+  / * handle the end of block * /
   begin = strstr(b, "{:end}");
   if (begin)
   {
     if (stack->count == 1)
     {
-      /* return _print_error("closing of non-opened block", line); */
+      / * return _print_error("closing of non-opened block", line); * /
       return CSTUFF_PARSE_ERROR;
     }
 
@@ -465,7 +546,7 @@ bak_parse_line(list_t stack, char * b, int line)
     return 0;
   }
 
-  /* handle the begining of block */
+  / * handle the begining of block * /
   begin = strstr(b, "{:begin ");
   if (begin) 
   {
@@ -495,22 +576,22 @@ bak_parse_line(list_t stack, char * b, int line)
       return line;
     }
     else
-      return CSTUFF_PARSE_ERROR; /* _print_error("bad block name", line); */
+      return CSTUFF_PARSE_ERROR; / * _print_error("bad block name", line); * /
   }
 
-  /* Parse labels and plain text */
+  / * Parse labels and plain text * /
   block = (stack->count) ? list_index(stack, stack->count-1) : NULL;
   end = b;
   while ( (begin = strstr(end, "{:var ")) )
   {
-    /* some text before label */
+    / * some text before label * /
     if (begin > end) 
     {
       l = (int) (begin-end);
       _append_node( block, PLAIN_NODE, str_ncopy(end, l), l);
     }
 
-    /* saving label */
+    / * saving label * /
     begin+=6;
     end = strstr(begin, "}");
     if(end)
@@ -525,12 +606,13 @@ bak_parse_line(list_t stack, char * b, int line)
       return _print_error("bad label name", line);
   }
 
-  /* plain text, even after label */
+  / * plain text, even after label * /
   l = strlen(end);
   if (l>0) _append_node( block, PLAIN_NODE, str_ncopy(end, l), l);
 
   return 0; // SUCCESS
 }
+*/
 
 /* public functions --------------------------------------------------------- */
 
@@ -539,57 +621,52 @@ templight_new(templight_t * self, const char * name, const char * root)
 {
   list_t        stack;
   FILE         *fd;
-  char         *fp;                         /* file path */
+  char         *fpath;                         /* file path */
   int           result = CSTUFF_SUCCESS;
 
-  fp = str_printf("%s/%s.tpl.html", root, name);
-  if (!fp)
+  if ( !(fpath = str_printf("%s/%s.tpl.html", root, name)) )
     return CSTUFF_MALLOC_ERROR;
 
-  if ( (fd = fopen(fp, "r")) == NULL )
-  {
-    /* init object */
-    if ( (*self = malloc(sizeof(struct templight))) != NULL )
-    {
+  if ( !(fd = fopen(fpath, "r")) )
+    RAISE(CSTUFF_SYSCALL_ERROR, finally);
 
-      if ( ! ((*self)->name = str_copy(name)) )
-        RAISE( CSTUFF_MALLOC_ERROR );
+  if ( !(stack = list_new(4)) ) /* stack for block tree */
+    RAISE(CSTUFF_MALLOC_ERROR, release_file);
 
-      (*self)->nodes    = NULL;
-      (*self)->pairs    = NULL;
-      (*self)->c_length = 0;
+  /* init object */
+  if ( !(*self = malloc(sizeof(struct templight))) )
+    RAISE(CSTUFF_MALLOC_ERROR, release_stack);
 
-      if ( (stack = list_new(4)) != NULL ) /* stack for block tree */
-      {
-        if (list_append(stack, *self) != -1)
-        {
-          result = _parse( fd, stack );
-        }
-        else
-          result = CSTUFF_MALLOC_ERROR;
+  if ( ! ((*self)->name = str_copy(name)) )
+    RAISE( CSTUFF_MALLOC_ERROR, except );
 
-        list_free(stack, NULL);
-      }
-      else
-        result = CSTUFF_MALLOC_ERROR;
-    }
-    else
-      result = CSTUFF_MALLOC_ERROR;
+  (*self)->nodes    = NULL;
+  (*self)->pairs    = NULL;
+  (*self)->c_length = 0;
+  (*self)->flags    = TEMPLIGHT_GREEDY;
 
-    fclose(fd);
-  }
-  else
-    result = CSTUFF_SYSCALL_ERROR;
+  if (list_append(stack, *self) == -1)
+    RAISE( CSTUFF_MALLOC_ERROR, except );
+
+  result = _parse( fd, stack );
 
   if (result == CSTUFF_SUCCESS)
     goto finally;
 
 except:
-  if (*self)
-    templight_free(self);
+  templight_free(*self);
+  *self = NULL;
 
 finally:
-  free( fp );
+
+release_stack:
+  list_free(stack, NULL);
+
+release_file:
+  fclose(fd);
+
+release_fpath:
+  free( fpath );
 
   return result;
 }
@@ -597,20 +674,39 @@ finally:
 /* -------------------------------------------------------------------------- */
 
 void
-templight_free(templight_t * self)
+templight_free(templight_t self)
 {
-  if (*self)
+  if (self)
   {
-    if ((*self)->name) free( (char*)(*self)->name);
+    if (self->name) free( (char*)self->name);
 
-    if ((*self)->pairs)
-      list_free((*self)->pairs, (list_destructor_t) pair_free);
+    if (self->pairs)
+      list_free(self->pairs, (list_destructor_t) pair_free);
 
-    if ((*self)->nodes)
-      list_free((*self)->nodes, (list_destructor_t) node_free);
+    if (self->nodes)
+      list_free(self->nodes, (list_destructor_t) node_free);
 
-    free((*self));
+    free(self);
   }
+}
+
+/* -------------------------------------------------------------------------- */
+
+void
+templight_set_greedy( templight_t self, int greedy )
+{
+  if (greedy)
+    self->flags |= TEMPLIGHT_GREEDY;
+  else if (self->flags & TEMPLIGHT_GREEDY)
+    self->flags ^= TEMPLIGHT_GREEDY;
+}
+
+/* -------------------------------------------------------------------------- */
+
+int
+templight_get_greedy( templight_t self )
+{
+  return (self->flags & TEMPLIGHT_GREEDY);
 }
 
 
@@ -639,13 +735,16 @@ templight_clone(templight_t self, templight_t * clone)
   if ( (*clone = calloc(1, sizeof(struct templight))) == NULL)
     goto e_malloc;
 
+  (*clone)->flags = self->flags;
+
   if ( ((*clone)->name = str_copy(self->name)) == NULL )
     goto e_malloc;
 
-  if (! self->nodes)
+  if (self->nodes)
   {
     if ( ((*clone)->nodes = list_new(self->nodes->count)) == NULL)
       goto e_malloc;
+
 
     if ( self->pairs && ((*clone)->pairs = list_new(self->pairs->count))==NULL)
       goto e_malloc;
@@ -661,7 +760,7 @@ templight_clone(templight_t self, templight_t * clone)
           if ( (n = node_new(LINK_NODE, n->data, n->size)) == NULL )
             goto e_malloc;
 
-          if ( list_append( clone->nodes, n ) == -1 )
+          if ( list_append( (*clone)->nodes, n ) == -1 )
             goto e_malloc;
 
           continue;
@@ -671,21 +770,22 @@ templight_clone(templight_t self, templight_t * clone)
           {
             if ( (ptr = str_copy((const char *) n->data))== NULL )
               goto e_malloc;
-            else
-              ptr = NULL;
+          }
+          else
+            ptr = NULL;
 
-            if ( (n = node_new(VAR_NODE, ptr, n->size)) == NULL )
-              goto e_malloc;
+          if ( (n = node_new(VAR_NODE, ptr, n->size)) == NULL )
+            goto e_malloc;
 
-            if (list_append(clone->nodes, n) == -1)
-              goto e_malloc;
+          if (list_append((*clone)->nodes, n) == -1)
+            goto e_malloc;
 
-            p = (pair_t) list_index(self->pairs, iP++);
-            if ( (p = pair_new(p->key, strlen(p->key), n)) == NULL )
-              goto e_malloc;
+          p = (pair_t) list_index(self->pairs, iP++);
+          if ( (p = pair_new(p->key, strlen(p->key), n)) == NULL )
+            goto e_malloc;
 
-            if (list_append(clone->pairs, p, n) == -1)
-              goto e_malloc;
+          if (list_append((*clone)->pairs, p) == -1)
+            goto e_malloc;
 
           continue;
 
@@ -703,11 +803,11 @@ templight_clone(templight_t self, templight_t * clone)
             if ( (p = pair_new(p->key, strlen(p->key), n)) == NULL )
               goto e_malloc;
 
-            if (list_append(clone->pairs, p) == -1)
+            if (list_append((*clone)->pairs, p) == -1)
               goto e_malloc;
           }
 
-          if ( list_append(clone->nodes, n) == -1)
+          if ( list_append((*clone)->nodes, n) == -1)
             goto e_malloc;
 
           continue;
@@ -722,8 +822,9 @@ e_malloc:
   result = CSTUFF_MALLOC_ERROR;
 
 except:
-  templight_free( clone );
-
+  if (*clone)
+    templight_free( *clone );
+  *clone = NULL;
 finally:
   return result;
 }
@@ -738,7 +839,7 @@ templight_new_block(templight_t self, templight_t * block, const char * label)
   pair_t      p;
   node_t      n;
 
-  if (self->pairs)
+  if (!self->pairs)
     return CSTUFF_NULL_OBJECT;
 
   for(i=0; i<self->pairs->count; i++)
@@ -756,6 +857,8 @@ templight_new_block(templight_t self, templight_t * block, const char * label)
       result = templight_clone( (templight_t ) p->node->data, block );
       if (result != CSTUFF_SUCCESS)
         goto except;
+
+      (*block)->flags = self->flags;
 
       /* find insert position */
       for (i=0; i<self->nodes->count; i++)
@@ -787,7 +890,8 @@ e_malloc:
   result = CSTUFF_MALLOC_ERROR;
 
 except:
-  templight_free(block);
+  templight_free(*block);
+  *block = NULL;
 
 finally:
   return result;
@@ -797,7 +901,7 @@ finally:
 /* -------------------------------------------------------------------------- */
 
 static int
-_set_value(templight_t self, int flags, const char *var_name, char *value)
+_set_value(templight_t self, const char *var_name, char *value)
 {
   int       i, l, result;
   pair_t    p;
@@ -805,8 +909,10 @@ _set_value(templight_t self, int flags, const char *var_name, char *value)
 
   result = 0;
 
+    
   if (!self->pairs)
     return result;
+
 
   l   = strlen(value),
   ptr = value;
@@ -834,9 +940,9 @@ _set_value(templight_t self, int flags, const char *var_name, char *value)
 
       ptr = NULL;
 
-      r++;
+      result++;
 
-      if ( !(flags & TEMPLIGHT_GREEDY) )
+      if ( !(self->flags & TEMPLIGHT_GREEDY) )
         goto finally;
     }
   }
@@ -849,19 +955,18 @@ except:
 finally:
   if (ptr) free(ptr);
 
-  return r;
+  return result;
 }
 
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_printf(templight_t self, int          flags,
-                                       const char * var_name, 
+templight_set_printf(templight_t self, const char * var_name, 
                                        const char * format, ...)
 {
   va_list list;
   va_start(list, format);
-  int result = templight_set_vprintf(self, flags var_name, format, list);
+  int result = templight_set_vprintf(self, var_name, format, list);
   va_end(list);
   return result;
 }
@@ -869,55 +974,50 @@ templight_set_printf(templight_t self, int          flags,
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_vprintf(templight_t self, int          flags,
-                                        const char * var_name, 
+templight_set_vprintf(templight_t self, const char * var_name, 
                                         const char * format,
                                         va_list      list)
 {
   char * value = str_vprintf(format, list);
 
-  return (value) ? _set_value(self, flags, var_name, value) : -1;
+  return (value) ? _set_value(self, var_name, value) : -1;
 }
 
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_string(templight_t self, int          flags,
-                                       const char * var_name,
+templight_set_string(templight_t self, const char * var_name,
                                        const char * value )
 {
   char * v = str_copy(value ? value : "");
 
-  return (v) ? _set_value(self, flags, var_name, v) : -1;
+  return (v) ? _set_value(self, var_name, v) : -1;
 }
 
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_integer(templight_t self, int          flags,
-                                        const char * var_name,
+templight_set_integer(templight_t self, const char * var_name,
                                         const int    value)
 {
   char * v = str_printf("%d", value);
-  return v ? _set_value(self, flags, var_name, v) : -1;
+  return v ? _set_value(self, var_name, v) : -1;
 }
 
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_float(templight_t self,   int            flags,
-                                        const char   * var_name,
+templight_set_float(templight_t self,   const char   * var_name,
                                         const double   value)
 {
   char * v = str_printf("%f", value);
-  return v ? _set_value(self, flags, var_name, v) : -1;
+  return v ? _set_value(self, var_name, v) : -1;
 }
 
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_block(templight_t self, int          flags,
-                                      const char * var_name,
+templight_set_block(templight_t self, const char * var_name,
                                       templight_t  value)
 {
   int      i, r, result;
@@ -957,7 +1057,7 @@ templight_set_block(templight_t self, int          flags,
 
       result++;
 
-      if ( !(flags & CSTUFF_GREEDY) )
+      if ( !(self->flags & TEMPLIGHT_GREEDY) )
         goto finally;
 
     }
@@ -972,6 +1072,7 @@ finally:
 }
 
 /* -------------------------------------------------------------------------- */
+#ifdef CSTUFF_TEMPLIGHT_WITH_AISL
 
 int
 templight_to_stream(templight_t self, aisl_stream_t s)
@@ -1017,6 +1118,8 @@ templight_to_stream(templight_t self, aisl_stream_t s)
     }
   }
 
+  goto finally;
+
 e_extcall:
   result = CSTUFF_EXTCALL_ERROR;
 except:
@@ -1025,6 +1128,7 @@ finally:
   return result;
 }
 
+#endif
 /* -------------------------------------------------------------------------- */
 
 int
@@ -1054,10 +1158,11 @@ templight_get_content_length(templight_t self)
 int
 templight_to_fstream(templight_t self, FILE * fstream)
 {
-  int    i = 0,
+  int    i = 0, l,
          result = CSTUFF_SUCCESS;
 
   node_t n;
+
 
   if (!self->nodes)
     goto finally;
@@ -1072,7 +1177,8 @@ templight_to_fstream(templight_t self, FILE * fstream)
       case PLAIN_NODE:
       case LINK_NODE:
       case VAR_NODE:
-        if ( fwrite((const char*) n->data, 1, n->size, fstream) != n->size)
+        l = fwrite((const char*) n->data, 1, n->size, fstream);
+        if ( l != n->size)
           goto e_extcall;
         break;
 
@@ -1086,6 +1192,8 @@ templight_to_fstream(templight_t self, FILE * fstream)
         break;
     }
   }
+
+  goto finally;
 
 e_extcall:
   result = CSTUFF_EXTCALL_ERROR;
