@@ -628,7 +628,7 @@ templight_new(templight_t * self, const char * name, const char * root)
     return CSTUFF_MALLOC_ERROR;
 
   if ( !(fd = fopen(fpath, "r")) )
-    RAISE(CSTUFF_SYSCALL_ERROR, finally);
+    RAISE(CSTUFF_SYSCALL_ERROR, release_fpath);
 
   if ( !(stack = list_new(4)) ) /* stack for block tree */
     RAISE(CSTUFF_MALLOC_ERROR, release_file);
@@ -1072,10 +1072,10 @@ finally:
 }
 
 /* -------------------------------------------------------------------------- */
-#ifdef CSTUFF_TEMPLIGHT_WITH_AISL
+#ifdef CSTUFF_TEMPLIGHT_WITH_TO_AISL_STREAM
 
 int
-templight_to_stream(templight_t self, aisl_stream_t s)
+templight_to_aisl_stream(templight_t self, aisl_stream_t s)
 {
   int    i = 0,
          result = CSTUFF_SUCCESS;
@@ -1110,7 +1110,7 @@ templight_to_stream(templight_t self, aisl_stream_t s)
       case BLOCK_NODE:
         if ( n->size == -1)
         {
-          result = templight_to_stream( ((templight_t) n->data), s );
+          result = templight_to_aisl_stream( ((templight_t) n->data), s );
           if ( result != CSTUFF_SUCCESS )
             goto except;
         }
