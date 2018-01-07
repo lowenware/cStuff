@@ -29,6 +29,7 @@ typedef enum
   DBX_STRING,
   DBX_CONSTANT,
   DBX_MD5_HASH,
+  DBX_STATEMENT,
 
   DBX_BOOLEAN
 

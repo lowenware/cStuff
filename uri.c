@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include "utils.h"
 
 
 #ifdef CSTUFF_WITH_URI_DECODE
