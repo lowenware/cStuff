@@ -56,7 +56,7 @@
   TYPE NAME = D_VALUE;
 
 #define CONFIG_SET_DEFAULT( NAME ) \
-  NAME = (typeof(NAME) ) NAME##Default;
+  NAME = (__typeof(NAME) ) NAME##Default;
 
 #define CONFIG_FREE( NAME ) \
   if ( NAME && ((void*) NAME != (void*) NAME##Default)){ \
