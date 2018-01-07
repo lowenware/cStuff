@@ -18,6 +18,7 @@ Set of ready C modules to be compiled into your Project.
 * str-utils - set of functions to operate null terminated strings
 * templight - class for generally HTML templating
 * uri - function to decode URI
+* version.h - common version structure
 * vmpc - C implementation of VMPC encription/decription algorithm
 
 ## The Idea
