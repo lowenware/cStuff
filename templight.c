@@ -315,6 +315,7 @@ _parse(FILE * fd, list_t stack)
   /* read to buffer */
   while( (l = fread(&buffer[d_len], 1, b_size - d_len - 1, fd)) > 0 )
   {
+    /* printf("%d = fread(&buffer[%d], 1, %d-%d-1, fd)\n", l, d_len, b_size, d_len); */
     d_len+=l;
 
     buffer[d_len] = 0;
@@ -471,8 +472,12 @@ _parse(FILE * fd, list_t stack)
 
       cursor=i;
     }
-    
-    if ((d_len -= i) > 0 )
+
+    if ((d_len -= i) < 0 )
+    {
+      d_len = 0;
+    }
+    else if (d_len > 0)
     {
       mode = MACRO_SEEK;
       memmove( buffer, &buffer[i], d_len );
