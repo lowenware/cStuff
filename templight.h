@@ -129,4 +129,12 @@ templight_to_fstream(templight_t self, FILE * fstream);
 
 /* -------------------------------------------------------------------------- */
 
+#ifdef CSTUFF_TEMPLIGHT_WITH_DUMP
+
+int
+templight_dump(templight_t self);
+
+#endif
+
+/* -------------------------------------------------------------------------- */
 #endif

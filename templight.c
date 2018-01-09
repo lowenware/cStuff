@@ -740,7 +740,8 @@ templight_clone(templight_t self, templight_t * clone)
   if ( (*clone = calloc(1, sizeof(struct templight))) == NULL)
     goto e_malloc;
 
-  (*clone)->flags = self->flags;
+  (*clone)->flags    = self->flags;
+  (*clone)->c_length = self->c_length;
 
   if ( ((*clone)->name = str_copy(self->name)) == NULL )
     goto e_malloc;
@@ -935,7 +936,7 @@ _set_value(templight_t self, const char *var_name, char *value)
 
       if ( p->node->data )
       {
-        self->c_length -= strlen( (const char*) p->node->data );
+        self->c_length -= p->node->size ;
         free( p->node->data );
       }
 
@@ -1207,4 +1208,65 @@ except:
 finally:
   return result;
 }
+/* -------------------------------------------------------------------------- */
 
+#ifdef CSTUFF_TEMPLIGHT_WITH_DUMP
+
+int
+templight_dump(templight_t self)
+{
+  int    i = 0, l,
+         result = CSTUFF_SUCCESS;
+
+  node_t n;
+
+  printf("-------------------------------- TEMPLIGHT DUMP --------------------------------\n");
+  printf("Name: %s\n", self->name);
+  printf("Size: %d\n", self->c_length);
+
+  if (!self->nodes)
+    goto finally;
+
+  for ( i=0; i<self->nodes->count; i++)
+  {
+    if ( (n = list_index(self->nodes, i))==NULL)
+      continue;
+
+    printf("--------------------------------------------------------------------------------\n");
+    printf("Node: %d\n", n->type);
+    printf("Size: %d\nLength: %lu\n", n->size, (n->data) ? strlen(n->data) : 0);
+
+    switch (n->type)
+    {
+      case PLAIN_NODE:
+      case LINK_NODE:
+      case VAR_NODE:
+        l = fwrite((const char*) n->data, 1, n->size, stdout);
+        printf("RES: %d\n", l);
+        if ( l != n->size)
+          goto e_extcall;
+        break;
+
+      case BLOCK_NODE:
+        if ( n->size == -1)
+        {
+          result = templight_dump( ((templight_t) n->data) );
+          if ( result != CSTUFF_SUCCESS )
+            goto except;
+        }
+        break;
+    }
+  }
+
+  goto finally;
+
+e_extcall:
+  result = CSTUFF_EXTCALL_ERROR;
+except:
+
+finally:
+  printf("--------------------------------------------------------------------------------\n");
+  return result;
+}
+
+#endif
