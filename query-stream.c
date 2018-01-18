@@ -2,8 +2,32 @@
 
 #include "query-stream.h"
 
+/* -------------------------------------------------------------------------- */
+
+
+#ifdef CSTUFF_QUERY_STREAM_WITH_CONSTRUCTOR
+
+query_stream_t
+query_stream_new( char separator )
+{
+  query_stream_t self;
+
+  if ( (self=calloc(1, sizeof(struct query_stream))) !=NULL )
+  {
+    self->key_len   = -1;
+    self->value_len = -1;
+    self->sep       = separator;
+  }
+
+  return self;
+}
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
 int
-query_stream_read(query_stream_t * q, const char * data, int size, bool is_full)
+query_stream_read(query_stream_t q, const char * data, int size, bool is_full)
 {
   int i = (q->value) ? (int) (q->value - data) + q->value_len + 1 : 0;
 
@@ -40,4 +64,6 @@ query_stream_read(query_stream_t * q, const char * data, int size, bool is_full)
 
   return i;
 }
+
+/* -------------------------------------------------------------------------- */
 

@@ -1,23 +1,14 @@
-#ifndef _STANDARD_DBX_H_
-#define _STANDARD_DBX_H_
+#ifndef _CSTUFF_DBX_H_
+#define _CSTUFF_DBX_H_
 
+#include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <libpq-fe.h>
 
+#include "retcodes.h"
+
 /* type --------------------------------------------------------------------- */
-
-typedef enum
-{
-  DBX_SUCCESS,
-
-  DBX_CONNECTING,
-  DBX_CONNECTION_ERROR,
-  
-  DBX_REQUEST_ERROR,
-  DBX_MALLOC_ERROR
-
-} dbx_status_t;
 
 typedef enum
 {
@@ -36,22 +27,28 @@ typedef enum
 } dbx_param_t;
 
 typedef bool /* true - free result, false - keep result */
-(*dbx_on_result_t)(PGresult *result, int res_i, void *u_data);
+(*dbx_on_result_t)( PGresult   * result,
+                    int          res_i,
+                    void       * u_data);
 
 typedef void
-(*dbx_on_error_t)(const char *error_message, int res_i, void *u_data);
-
-
-extern char   *dbxUri;
-extern PGconn *dbxConn;
+(*dbx_on_error_t)(  const char * e_message,
+                    int          res_i,
+                    void       * u_data,
+                    const char * e_sql );
 
 #define dbx_escape(x) PQescapeLiteral(dbxConn, x, strlen(x))
 #define dbx_free(x)   PQfreemem(x)
 
 /* init subsystem ----------------------------------------------------------- */
 
-bool
-dbx_init();
+cstuff_retcode_t
+dbx_init( const char * username,
+          const char * password,
+          const char * database,
+          const char * hostname,
+          int          port,
+          int          connections );
 
 /* release used resources --------------------------------------------------- */
 
@@ -60,7 +57,7 @@ dbx_release();
 
 /* refresh subsystem data --------------------------------------------------- */
 
-dbx_status_t
+cstuff_retcode_t
 dbx_touch(bool reconnect, bool is_error);
 
 /* query request ------------------------------------------------------------ */
@@ -92,10 +89,10 @@ dbx_get_error();
 #define dbx_as_string( pg_result, row_num, col_num ) \
         PQgetvalue(pg_result, row_num, col_num)
 
-#define dbx_as_integer( pg_result, row_num, col_num ) \
-        strtol(PQgetvalue(pg_result, row_num, col_num), NULL, 10)
+#define dbx_as_bool( pg_result, row_num, col_num ) \
+       ((PQgetvalue(pg_result, row_num, col_num)[0]=='t') ? true : false)
 
-#define dbx_as_int64( pg_result, row_num, col_num ) \
+#define dbx_as_integer( pg_result, row_num, col_num ) \
         strtoll(PQgetvalue(pg_result, row_num, col_num), NULL, 10)
 
 #define dbx_as_datetime( pg_result, dt_ptr, row_num, col_num )                 \

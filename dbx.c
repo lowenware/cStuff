@@ -3,12 +3,17 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
+#include "retcodes.h"
 #include "list.h"
 #include "sock-utils.h"
 #include "str-utils.h"
 #include "dbx.h"
 
-/* type --------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+const char dbxUriFormat[]="postgresql://%s:%s@%s:%d/%s";
+
+/* -------------------------------------------------------------------------- */
 
 typedef PostgresPollingStatusType (*pg_poll_t)(PGconn *conn);
 
@@ -18,42 +23,45 @@ struct _param
   int    len;
 };
 
-
 /* globals ------------------------------------------------------------------ */
 
 /* postgresql connection */
-PGconn *dbxConn  = NULL;
+PGconn         * dbxConn        = NULL;
+
+/* connection URI */
+static char    * dbxUri         = NULL;
 
 /* requests queue */
-static list_t dbx_queue = NULL;
+static list_t    dbxQueue       = NULL;
+
+/* connections number */
+static int       dbxConnections = 1;
 
 /* postgresql connection socket */
-static int dbx_sock;
+static int       dbxSock        = 0;
 
 /* function to poll connection PQconnectPoll or PQresetPoll */
-static pg_poll_t dbx_poll_func;
+static pg_poll_t dbxPollFunc;
 
 /* result of last poll function call */
-static PostgresPollingStatusType dbx_poll_type;
+static PostgresPollingStatusType dbxPollType;
 
 /* request is pending identifier */
-static bool dbx_is_pending;
+static bool dbxIsPending;
 
+/* query identificator */
 static uint64_t dbxQueryId = 0;
 
 
 static void
 dbx_reset_globals(pg_poll_t poll_func)
 {
-  dbx_poll_func  = poll_func;
-  dbx_poll_type  = PGRES_POLLING_WRITING;
-  dbx_is_pending = false;
-  dbx_sock       = PQsocket(dbxConn);
+  dbxPollFunc  = poll_func;
+  dbxPollType  = PGRES_POLLING_WRITING;
+  dbxIsPending = false;
+  dbxSock      = PQsocket(dbxConn);
 }
 
-
-/* connection uri to be set up elswhere */
-char  *dbxUri = NULL;
 
 
 /* dbx_request_t ------------------------------------------------------------ */
@@ -80,15 +88,37 @@ dbx_request_free(dbx_request_t req)
 
 /* init subsystem ----------------------------------------------------------- */
 
-bool
-dbx_init()
+int
+dbx_init( const char * username,
+          const char * password,
+          const char * database,
+          const char * hostname,
+          int          port,
+          int          connections )
 {
-  
-  if (dbx_queue) return true;
+  dbxUri = str_printf( dbxUriFormat, 
+                       username,
+                       password,
+                       hostname,
+                       port,
+                       database );
 
-  dbx_queue = list_new(1);
+  if ( !dbxUri )
+    goto e_malloc;
 
-  return (dbx_queue) ? true : false;
+  if ( !(dbxQueue = list_new(4)) )
+    goto release_uri;
+
+  dbxConnections = (connections) ? connections : 1;
+
+  return CSTUFF_SUCCESS;
+
+release_uri:
+  free(dbxUri);
+  dbxUri = NULL;
+
+e_malloc:
+  return CSTUFF_MALLOC_ERROR;
 }
 
 /* release used resources --------------------------------------------------- */
@@ -96,16 +126,16 @@ dbx_init()
 void
 dbx_release()
 {
-  if (dbx_queue)
-  {
-    list_free(dbx_queue, (list_destructor_t) dbx_request_free);
-    dbx_queue = NULL;
-  }
+  free(dbxUri);
+  dbxUri = NULL;
+
+  list_free(dbxQueue, (list_destructor_t) dbx_request_free);
+  dbxQueue = NULL;
 }
 
 /* refresh subsystem data --------------------------------------------------- */
 
-dbx_status_t
+cstuff_retcode_t
 dbx_touch(bool reconnect, bool is_error)
 {
   PGresult *pg_result;
@@ -117,24 +147,24 @@ dbx_touch(bool reconnect, bool is_error)
     if (dbxConn)
       PQfinish(dbxConn);
 
-    dbxConn = PQconnectStart(dbxUri);
+    if (! (dbxConn = PQconnectStart(dbxUri)) )
+      return CSTUFF_MALLOC_ERROR;
+
     dbx_reset_globals( PQconnectPoll );
   }
-
-  if (!dbxConn) return DBX_MALLOC_ERROR;
 
   switch(PQstatus(dbxConn))
   {
     case CONNECTION_OK:
       /* handle requests */
-      if (dbx_is_pending)
+      if (dbxIsPending)
       {
-        if (sock_has_input(dbx_sock, 100))
+        if (sock_has_input(dbxSock, 100))
         {
           if (PQconsumeInput(dbxConn))
           {
             if (PQisBusy(dbxConn))
-              return DBX_SUCCESS;
+              return CSTUFF_SUCCESS;
 
             while ((pg_result = PQgetResult(dbxConn)) != NULL)
             {
@@ -152,7 +182,8 @@ dbx_touch(bool reconnect, bool is_error)
                     r->on_error(
                       PQresultErrorMessage(pg_result),
                       results_count, 
-                      r->u_data
+                      r->u_data,
+                      r->sql
                     );
 
                   PQclear(pg_result);
@@ -161,65 +192,65 @@ dbx_touch(bool reconnect, bool is_error)
             }
 
             dbx_request_free(r);
-            list_remove_index(dbx_queue, 0);
-            dbx_is_pending = false;
+            list_remove_index(dbxQueue, 0);
+            dbxIsPending = false;
           }
           else
           {
             fprintf(stderr, "[DBX] could not consume input from DB\n");
-            return DBX_CONNECTION_ERROR;
+            return CSTUFF_EXTCALL_ERROR;
           }
         }
       }
-      else if (dbx_queue->count)
+      else if (dbxQueue->count)
       {
         printf("get request from queue\n");
-        r = list_index(dbx_queue, 0);
+        r = list_index(dbxQueue, 0);
         if (!PQsendQuery(dbxConn, r->sql))
         {
           fprintf(stderr, "[DBX] could not send query to DB\n");
-          return DBX_CONNECTION_ERROR;
+          return CSTUFF_EXTCALL_ERROR;
         }
-        dbx_is_pending = true;
+        dbxIsPending = true;
         results_count = 0;
       }
 
-      return DBX_SUCCESS;
+      return CSTUFF_SUCCESS;
 
     case CONNECTION_BAD:
       if (is_error)
       {
         PQresetStart(dbxConn);
         dbx_reset_globals( PQconnectPoll );
-        return DBX_CONNECTING;
+        return CSTUFF_PENDING;
       }
       else
-        return DBX_CONNECTION_ERROR;
+        return CSTUFF_EXTCALL_ERROR;
 
     default:
 
-      switch (dbx_poll_type)
+      switch (dbxPollType)
       {
         case PGRES_POLLING_OK:
-          return DBX_SUCCESS;
+          return CSTUFF_SUCCESS;
 
         case PGRES_POLLING_FAILED:
-          return DBX_CONNECTION_ERROR;
+          return CSTUFF_EXTCALL_ERROR;
         
         case PGRES_POLLING_READING:
-          if (sock_has_input(dbx_sock,100) < 1)
-            return DBX_CONNECTING;
+          if (sock_has_input(dbxSock,100) < 1)
+            return CSTUFF_PENDING;
           break;
         case PGRES_POLLING_WRITING:
-          if (sock_can_write(dbx_sock,100) < 1)
-            return DBX_CONNECTING;
+          if (sock_can_write(dbxSock,100) < 1)
+            return CSTUFF_PENDING;
           break;
         case PGRES_POLLING_ACTIVE:
-          return DBX_CONNECTING;
+          return CSTUFF_PENDING;
       }
-      dbx_poll_type = dbx_poll_func(dbxConn);
+      dbxPollType = dbxPollFunc(dbxConn);
   }
-  return DBX_CONNECTING;
+  return CSTUFF_PENDING;
 }
 
 
@@ -242,7 +273,7 @@ dbx_query(char * sql, dbx_on_result_t  on_result,
   r->on_result = on_result;
   r->on_error  = on_error;
 
-  list_append(dbx_queue, r);
+  list_append(dbxQueue, r);
 
   
   return r->id;
@@ -402,15 +433,15 @@ dbx_format_query( const char      *sql_format,
 uint64_t
 dbx_cancel(uint64_t id)
 {
-  if (!dbx_queue) return 0;
+  if (!dbxQueue) return 0;
 
   int i;
-  for (i=0; i<dbx_queue->count; i++)
+  for (i=0; i<dbxQueue->count; i++)
   {
-    if (((dbx_request_t) list_index(dbx_queue, i))->id == id)
+    if (((dbx_request_t) list_index(dbxQueue, i))->id == id)
     {
-      ((dbx_request_t) list_index(dbx_queue, i))->on_result = NULL;
-      ((dbx_request_t) list_index(dbx_queue, i))->on_error  = NULL;
+      ((dbx_request_t) list_index(dbxQueue, i))->on_result = NULL;
+      ((dbx_request_t) list_index(dbxQueue, i))->on_error  = NULL;
       return id;
     }
   }
