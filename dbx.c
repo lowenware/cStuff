@@ -1,3 +1,5 @@
+/* dbx.c : source file of asynchronous PostgreSQL Database Engine
+ * */
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
@@ -11,71 +13,72 @@
 
 /* -------------------------------------------------------------------------- */
 
-const char dbxUriFormat[]="postgresql://%s:%s@%s:%d/%s";
+static const char dbxUriFormat[] = "postgresql://%s:%s@%s:%d/%s",
+                  dbxNullStr[]   = "NULL",
+                  dbxTrueStr[]   = "TRUE",
+                  dbxFalseStr[]  = "FALSE";
 
 /* -------------------------------------------------------------------------- */
 
-typedef PostgresPollingStatusType (*pg_poll_t)(PGconn *conn);
-
-struct _param
+struct dbx_param
 {
-  char * str;
-  int    len;
+  const char   * value;
+  int            length;
+  dbx_param_t    type;
 };
 
-/* globals ------------------------------------------------------------------ */
-
-/* postgresql connection */
-PGconn         * dbxConn        = NULL;
+/* -------------------------------------------------------------------------- */
 
 /* connection URI */
-static char    * dbxUri         = NULL;
+static char    * dbxUri;
 
-/* requests queue */
-static list_t    dbxQueue       = NULL;
+/* -------------------------------------------------------------------------- */
+
+/* connections pointers */
+PGconn        ** dbxConnPool;
 
 /* connections number */
-static int       dbxConnections = 1;
+static int       dbxConnSize;
 
-/* postgresql connection socket */
-static int       dbxSock        = 0;
+/* connections number */
+static int       dbxConnIter;
 
-/* function to poll connection PQconnectPoll or PQresetPoll */
-static pg_poll_t dbxPollFunc;
+/* connection mask 1 = connected, 0 = not connected */
+static uint64_t  dbxConnMask; 
 
-/* result of last poll function call */
-static PostgresPollingStatusType dbxPollType;
+/* business mask 1 = busy, 0 = available */
+static uint64_t  dbxConnBusy; 
 
-/* request is pending identifier */
-static bool dbxIsPending;
+/* pgres polling and result counter */
+static int     * dbxConnCell;
+
+/* -------------------------------------------------------------------------- */
+
+const char     * dbxErrorMessage;
+
+/* -------------------------------------------------------------------------- */
+
+/* requests queue */
+static list_t    dbxQueue;
+
+/* -------------------------------------------------------------------------- */
 
 /* query identificator */
-static uint64_t dbxQueryId = 0;
-
-
-static void
-dbx_reset_globals(pg_poll_t poll_func)
-{
-  dbxPollFunc  = poll_func;
-  dbxPollType  = PGRES_POLLING_WRITING;
-  dbxIsPending = false;
-  dbxSock      = PQsocket(dbxConn);
-}
-
-
+static uint64_t dbxQueryId;
 
 /* dbx_request_t ------------------------------------------------------------ */
 
-struct _dbx_request_t 
+struct dbx_request 
 {
   uint64_t           id;
-  char              *sql;
-  void              *u_data;
+  char             * sql;
+  void             * u_data;
+  PGconn           * conn;
   dbx_on_result_t    on_result;
   dbx_on_error_t     on_error;
 };
 
-typedef struct _dbx_request_t * dbx_request_t;
+typedef struct dbx_request * dbx_request_t;
 
 static void
 dbx_request_free(dbx_request_t req)
@@ -84,11 +87,81 @@ dbx_request_free(dbx_request_t req)
   free(req);
 }
 
+/* -------------------------------------------------------------------------- */
+
+static dbx_request_t
+dbx_queue_get( PGconn * conn )
+{
+  int             i = 0;
+  dbx_request_t   req = NULL;
+
+  while (i < dbxQueue->count)
+  {
+    req = list_index(dbxQueue, i);
+
+    if ( req->conn == conn ) break;
+
+    req = NULL;
+
+    i++;
+  }
+  return req;
+}
 
 
-/* init subsystem ----------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
-int
+static void
+dbx_queue_release( PGconn * conn )
+{
+  int             i = 0;
+  dbx_request_t   req = NULL;
+
+  while (i < dbxQueue->count)
+  {
+    req = list_index(dbxQueue, i);
+
+    if ( req->conn == conn )
+    {
+      req->conn = NULL;
+      break;
+    }
+
+    i++;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+
+static uint64_t
+dbx_queue_add(char * sql, dbx_on_result_t  on_result,
+                          dbx_on_error_t   on_error, 
+                          void            *u_data)
+{
+  dbx_request_t r;
+
+  if ( !(r = malloc(sizeof (struct dbx_request))) )
+    return 0;
+
+  r->id        = ++dbxQueryId ? dbxQueryId : ++dbxQueryId;
+  r->sql       = sql;
+  r->u_data    = u_data;
+  r->on_result = on_result;
+  r->on_error  = on_error;
+  r->conn      = NULL;
+
+  if (list_append(dbxQueue, r) == -1)
+  {
+    free(r);
+    return 0;
+  }
+
+  return r->id;
+}
+
+/* -------------------------------------------------------------------------- */
+
+cstuff_retcode_t
 dbx_init( const char * username,
           const char * password,
           const char * database,
@@ -109,9 +182,32 @@ dbx_init( const char * username,
   if ( !(dbxQueue = list_new(4)) )
     goto release_uri;
 
-  dbxConnections = (connections) ? connections : 1;
+  if (connections > (sizeof(dbxConnBusy)*8))
+    dbxConnSize = sizeof(dbxConnBusy)*8;
+  else if (connections < 1)
+    dbxConnSize = 1;
+  else
+    dbxConnSize = connections;
+
+  if ( !(dbxConnPool = calloc(dbxConnSize, sizeof(void*))) )
+    goto release_queue;
+
+  if ( !(dbxConnCell = malloc(dbxConnSize*sizeof(PostgresPollingStatusType))) )
+    goto release_list;
+
+  dbxConnBusy     = 0;
+  dbxConnMask     = 0;
+  dbxConnIter     = 0;
+  dbxQueryId      = 0;
+  dbxErrorMessage = NULL;
 
   return CSTUFF_SUCCESS;
+
+release_list:
+  free(dbxConnPool);
+
+release_queue:
+  list_free(dbxQueue, free);
 
 release_uri:
   free(dbxUri);
@@ -121,340 +217,489 @@ e_malloc:
   return CSTUFF_MALLOC_ERROR;
 }
 
-/* release used resources --------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
 void
 dbx_release()
 {
+  int i;
+
   free(dbxUri);
-  dbxUri = NULL;
 
   list_free(dbxQueue, (list_destructor_t) dbx_request_free);
-  dbxQueue = NULL;
-}
 
-/* refresh subsystem data --------------------------------------------------- */
-
-cstuff_retcode_t
-dbx_touch(bool reconnect, bool is_error)
-{
-  PGresult *pg_result;
-  static dbx_request_t r;
-  static int results_count;
-
-  if (reconnect)
+  for (i=0; i<dbxConnSize; i++)
   {
-    if (dbxConn)
-      PQfinish(dbxConn);
-
-    if (! (dbxConn = PQconnectStart(dbxUri)) )
-      return CSTUFF_MALLOC_ERROR;
-
-    dbx_reset_globals( PQconnectPoll );
+    if (dbxConnPool[i])
+      PQfinish( dbxConnPool[i] );
   }
 
-  switch(PQstatus(dbxConn))
+  free( dbxConnPool );
+  free( dbxConnCell );
+}
+
+/* -------------------------------------------------------------------------- */
+
+static cstuff_retcode_t
+dbx_touch_connection( PGconn * conn )
+{
+  PGresult     * res;
+  dbx_request_t  req;
+
+  if ( !(dbxConnBusy & (1<<dbxConnIter)) )
   {
-    case CONNECTION_OK:
-      /* handle requests */
-      if (dbxIsPending)
+    if ( dbxQueue->count )
+    {
+      if ( (req = dbx_queue_get( NULL )) != NULL )
       {
-        if (sock_has_input(dbxSock, 100))
+        if ( PQsendQuery(conn, req->sql) )
         {
-          if (PQconsumeInput(dbxConn))
-          {
-            if (PQisBusy(dbxConn))
-              return CSTUFF_SUCCESS;
+          /* set request handling */
+          req->conn = conn;
+          /* set connection busy */
+          dbxConnBusy |= (1<<dbxConnIter);
+          /* reset result counter */
+          dbxConnCell[ dbxConnIter ] = 0;
 
-            while ((pg_result = PQgetResult(dbxConn)) != NULL)
+        }
+        else
+          return CSTUFF_EXTCALL_ERROR;
+      }
+    }
+    else
+    {
+      if ( !dbxConnBusy )
+        return CSTUFF_PENDING;
+    }
+
+    return CSTUFF_SUCCESS;
+  }
+
+  /* there is already some request handled via connection */
+
+  req = dbx_queue_get( conn );
+
+  if (sock_has_input( PQsocket(conn), 50))
+  {
+    if (PQconsumeInput(conn))
+    {
+      if (PQisBusy(conn))
+        return CSTUFF_SUCCESS;
+
+      while ((res = PQgetResult(conn)) != NULL)
+      {
+        switch (PQresultStatus(res))
+        {
+          case PGRES_COMMAND_OK:
+          case PGRES_TUPLES_OK:
+            if (req->on_result)
             {
-              switch (PQresultStatus(pg_result))
-              {
-                case PGRES_COMMAND_OK:
-                case PGRES_TUPLES_OK:
-                  if (!r->on_result || 
-                       r->on_result(pg_result, results_count, r->u_data))
-                    PQclear(pg_result);
-                  break;
-                default:
+              if (!(req->on_result(res, dbxConnCell[dbxConnIter], req->u_data)))
+                break;
+            }
+            PQclear(res);
+            break;
 
-                  if (r->on_error)
-                    r->on_error(
-                      PQresultErrorMessage(pg_result),
-                      results_count, 
-                      r->u_data,
-                      r->sql
-                    );
-
-                  PQclear(pg_result);
-              }
-              results_count++;
+          default:
+            if (req->on_error)
+            {
+              req->on_error(
+                PQresultErrorMessage(res),
+                dbxConnCell[dbxConnIter],
+                req->u_data,
+                req->sql
+              );
             }
 
-            dbx_request_free(r);
-            list_remove_index(dbxQueue, 0);
-            dbxIsPending = false;
-          }
-          else
-          {
-            fprintf(stderr, "[DBX] could not consume input from DB\n");
-            return CSTUFF_EXTCALL_ERROR;
-          }
+            PQclear(res);
         }
-      }
-      else if (dbxQueue->count)
-      {
-        printf("get request from queue\n");
-        r = list_index(dbxQueue, 0);
-        if (!PQsendQuery(dbxConn, r->sql))
-        {
-          fprintf(stderr, "[DBX] could not send query to DB\n");
-          return CSTUFF_EXTCALL_ERROR;
-        }
-        dbxIsPending = true;
-        results_count = 0;
+        dbxConnCell[dbxConnIter]++;
       }
 
-      return CSTUFF_SUCCESS;
+      list_remove(dbxQueue, req);
+      dbx_request_free(req);
+
+      dbxConnBusy ^= (1<<dbxConnIter);
+    }
+    else
+      return CSTUFF_EXTCALL_ERROR;
+  }
+
+  return CSTUFF_SUCCESS;
+}
+
+/* -------------------------------------------------------------------------- */
+
+cstuff_retcode_t
+dbx_touch()
+{
+  cstuff_retcode_t result = CSTUFF_PENDING;
+
+  if ( ! dbxConnPool[ dbxConnIter ] ) /* not assigned yet */
+  {
+    if ( !(dbxConnPool[ dbxConnIter ] = PQconnectStart(dbxUri)) )
+    {
+      result = CSTUFF_MALLOC_ERROR;
+      goto finally;
+    }
+    dbxConnCell[ dbxConnIter ] = PGRES_POLLING_WRITING;
+  }
+
+  switch(PQstatus(dbxConnPool[dbxConnIter]))
+  {
+    case CONNECTION_OK:
+      dbxConnMask |= (1<<dbxConnIter);
+/*      printf( "(dbxConnMask |= (1<<dbxConnIter)) == %"PRIu64"\n", dbxConnMask); */
+      result = dbx_touch_connection( dbxConnPool[dbxConnIter] );
+      break;
 
     case CONNECTION_BAD:
-      if (is_error)
+      if (dbxConnMask & (1<<dbxConnIter))
+        dbxConnMask ^= (1<<dbxConnIter);
+
+      if ( dbxConnBusy & (1<<dbxConnIter) ) /* release request */
       {
-        PQresetStart(dbxConn);
-        dbx_reset_globals( PQconnectPoll );
-        return CSTUFF_PENDING;
+        /* make sure we've released all querries */
+        dbx_queue_release( dbxConnPool[ dbxConnIter ] );
+        /* unset busy flag to use proper poll function */
+        dbxConnBusy ^= (1<<dbxConnIter);
       }
-      else
-        return CSTUFF_EXTCALL_ERROR;
+
+      PQfinish(dbxConnPool[dbxConnIter]);
+      dbxConnPool[dbxConnIter] = NULL;
+
+      dbxErrorMessage = PQerrorMessage( dbxConnPool[dbxConnIter] );
+
+      result = CSTUFF_EXTCALL_ERROR;
+      break;
 
     default:
+      result = CSTUFF_SUCCESS;
 
-      switch (dbxPollType)
+      switch( dbxConnCell[ dbxConnIter ] )
       {
-        case PGRES_POLLING_OK:
-          return CSTUFF_SUCCESS;
-
         case PGRES_POLLING_FAILED:
-          return CSTUFF_EXTCALL_ERROR;
-        
+          result = CSTUFF_EXTCALL_ERROR;
+          goto finally;
+
         case PGRES_POLLING_READING:
-          if (sock_has_input(dbxSock,100) < 1)
-            return CSTUFF_PENDING;
+          if (sock_has_input( PQsocket(dbxConnPool[dbxConnIter]), 50) < 1)
+            goto finally;
           break;
+
         case PGRES_POLLING_WRITING:
-          if (sock_can_write(dbxSock,100) < 1)
-            return CSTUFF_PENDING;
+          if (sock_can_write( PQsocket(dbxConnPool[dbxConnIter]), 50) < 1)
+            goto finally;
           break;
+
+        case PGRES_POLLING_OK:
         case PGRES_POLLING_ACTIVE:
-          return CSTUFF_PENDING;
+          goto finally;
       }
-      dbxPollType = dbxPollFunc(dbxConn);
+
+      dbxConnCell[ dbxConnIter ] = PQconnectPoll(dbxConnPool[dbxConnIter]);
   }
-  return CSTUFF_PENDING;
+
+
+finally: /* always iterate connection */
+  if ( !(++dbxConnIter < dbxConnSize) )
+    dbxConnIter = 0;
+
+  return result;
 }
 
+/* -------------------------------------------------------------------------- */
 
-/* query request ------------------------------------------------------------ */
-
-uint64_t
-dbx_query(char * sql, dbx_on_result_t  on_result,
-                      dbx_on_error_t   on_error, 
-                      void            *u_data)
+static void
+dbx_query_int32_to_chars( int32_t            value,
+                          char            ** p_chars,
+                          const char       * format )
 {
-  if (! sql || ! on_result) return 0;
-
-  dbx_request_t r = malloc(sizeof (struct _dbx_request_t));
-
-  if (!r) return 0;
-
-  r->id        = ++dbxQueryId ? dbxQueryId : ++dbxQueryId;
-  r->sql       = sql;
-  r->u_data    = u_data;
-  r->on_result = on_result;
-  r->on_error  = on_error;
-
-  list_append(dbxQueue, r);
-
-  
-  return r->id;
+  if ( (*p_chars = malloc(11)) != NULL)
+    sprintf( *p_chars, format, value);
 }
 
-uint64_t
-dbx_format_query( const char      *sql_format,
-                  dbx_on_result_t  on_result,
-                  dbx_on_error_t   on_error, 
-                  void            *u_data,
-                  int              p_count,
-                  ... )
+/* -------------------------------------------------------------------------- */
+
+static void
+dbx_query_int64_to_chars( int64_t            value,
+                          char            ** p_chars,
+                          const char       * format )
 {
-  /* prepare params array */
-  struct _param * p = calloc(p_count, sizeof(struct _param));
-  if (!p) return 0;
+  if ( (*p_chars = malloc(21)) != NULL)
+    sprintf( *p_chars, format, value);
+}
 
-  int64_t     v_int;
-  char      * v_chars,
-            * sql,
-              buffer[32+1];
-  int         i, l, t;
+/* -------------------------------------------------------------------------- */
 
-  /* preapare params */
-  va_list arg;
-  va_start(arg, p_count);
+static PGconn *
+dbx_get_allocated_connection()
+{
+  int i=0;
+
+  while (i<dbxConnSize)
+  {
+    if ( dbxConnPool[i] )
+      return dbxConnPool[i];
+    i++;
+  }
+
+  return NULL;
+}
+
+/* -------------------------------------------------------------------------- */
+
+static cstuff_retcode_t
+dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
+{
+  int      i, j;
+  char   * ch_ptr,
+         * value;
+  PGconn * conn = NULL;
+
 
   for (i=0; i<p_count; i++)
   {
-    switch( va_arg(arg, int) )
+    value          = NULL;
+    p_list[i].type = va_arg(a_list, int);
+
+    switch( p_list[i].type )
     {
-      case DBX_INT:
-        v_int = va_arg(arg, int);
-        sprintf(buffer, "%d", (int) (v_int & 0xFFFFFFFF));
-        p[i].str = str_copy(buffer);
+      case DBX_INT32:
+        dbx_query_int32_to_chars(va_arg(a_list,int32_t), &value, "%d");
         break;
 
-      case DBX_UINT:
-        v_int = va_arg(arg, int);
-        sprintf(buffer, "%u", (unsigned int) (v_int & 0xFFFFFFFF));
-        p[i].str = str_copy(buffer);
+      case DBX_UINT32:
+        dbx_query_int32_to_chars(va_arg(a_list,int32_t), &value, "%d");
         break;
 
       case DBX_INT64:
-        v_int = va_arg(arg, int64_t);
-        sprintf(buffer, "%"PRId64, v_int);
-        p[i].str = str_copy(buffer);
+        dbx_query_int64_to_chars(va_arg(a_list,int64_t), &value, "%"PRId64);
         break;
 
       case DBX_UINT64:
-        v_int = va_arg(arg, uint64_t);
-        sprintf(buffer, "%"PRIu64, (uint64_t) v_int);
-        p[i].str = str_copy(buffer);
+        dbx_query_int64_to_chars(va_arg(a_list,int64_t), &value, "%"PRIu64);
         break;
 
       case DBX_CONSTANT:
-        v_chars = va_arg(arg, char *);
-        v_int = strlen(v_chars)+2+1;
-        p[i].str = malloc(v_int);
-        if (p[i].str)
-          sprintf(p[i].str, "'%s'", v_chars);
+        if ((ch_ptr = va_arg(a_list, char *)) != NULL)
+        {
+          if ( (value = malloc( strlen(ch_ptr)+2+1 )) != NULL)
+          {
+            sprintf(value, "'%s'", ch_ptr);
+          }
+        }
+        else
+          value = (char *) dbxNullStr;
+
         break;
 
       case DBX_STATEMENT:
-        v_chars = va_arg(arg, char *);
-        v_int = strlen(v_chars)+2+1;
-        p[i].str = malloc(v_int);
-        if (p[i].str)
-          sprintf(p[i].str, "%s", v_chars);
+        ch_ptr = va_arg(a_list, char *); 
+        value =  ch_ptr ? ch_ptr : (char*) dbxNullStr;
         break;
 
       case DBX_STRING:
-        v_chars = va_arg(arg, char *);
-        
-        p[i].str = (v_chars) ?
-                      PQescapeLiteral( dbxConn, v_chars, strlen(v_chars) ) :
-                      str_copy("NULL");
+        if ((ch_ptr = va_arg(a_list, char *)) != NULL)
+        {
+          if (!conn) 
+            conn = dbx_get_allocated_connection();
+
+          value = PQescapeLiteral(conn, ch_ptr, strlen(ch_ptr));
+        }
+        else
+          value = (char *) dbxNullStr;
+
         break;
 
       case DBX_MD5_HASH:
-        v_chars = va_arg(arg, char *);
-        p[i].str = malloc( (32+2+1) * sizeof(char));
-        if (p[i].str)
+        ch_ptr = va_arg(a_list, char *);
+        if ( (value = malloc( (32+2+1) * sizeof(char))) != NULL )
         {
-          for (v_int = 0; v_int < 16; v_int++)
+          value[0] ='\'';
+
+          for (j = 0; j < 16; j++)
           {
-            sprintf(&buffer[v_int*2], "%02x", v_chars[v_int] & 0xFF);
+            sprintf(&value[1+j*2], "%02x", ch_ptr[j] & 0xFF);
           }
-          buffer[32] = 0;
-          sprintf(p[i].str, "'%s'", buffer);
+
+          value[33]='\'';
+          value[34]='0';
         }
         break;
 
       case DBX_BOOLEAN:
-        v_int = va_arg(arg, int);
-        sprintf(buffer, "%s", v_int ? "TRUE" : "FALSE");
-        p[i].str = str_copy(buffer);
+        value = (char*) (va_arg(a_list, int) ? dbxTrueStr : dbxFalseStr);
         break;
     }
-    p[i].len = (p[i].str) ? strlen( p[i].str ) : 0;
-  }
-  va_end(arg);
 
-  /* calculate final size */
-  l = strlen( sql_format );
-  t = l;
-  for ( i=0; i < l; i++ )
-  {
-    if (sql_format[i] == '$')
+    if ( value )
     {
-      v_int = strtol(&sql_format[i+1], NULL, 10);
-      if (v_int-- && v_int < p_count)
-      {
-        t += p[ v_int ].len;
-      }
+      p_list[i].length = strlen( value );
+      p_list[i].value  = value;
     }
+    else
+       return CSTUFF_MALLOC_ERROR;
+
   }
 
-
-  /* make string */
-  sql = calloc((size_t)t &0xFFFF, sizeof(char));
-  char * sql_p = sql;
-
-  for ( i=0; i < l; i++ )
-  {
-    if (sql_format[i] == '$')
-    {
-      v_int = strtol(&sql_format[i+1], &v_chars, 10);
-      if (v_int-- && v_int < p_count)
-      {
-        strncpy(sql_p, p[v_int].str, p[ v_int ].len);
-        sql_p += p[ v_int ].len;
-        i += (v_chars - &sql_format[i]);
-      }
-    }
-
-    *(sql_p++) = sql_format[i];
-  }
-
-  /* free resources */
-
-  for ( i=0; i< p_count; i++)
-  {
-    if (p[i].str)
-      free(p[i].str);
-  }
-  free(p);
-
-  /* printf ("FORMATED SQL: %s :: %d\n", sql, t); */
-
-  return dbx_query(sql, on_result, on_error, u_data);
-
+  return CSTUFF_SUCCESS;
 }
 
-
+/* -------------------------------------------------------------------------- */
 
 uint64_t
-dbx_cancel(uint64_t id)
+dbx_query( const char      * sql_format,
+           dbx_on_result_t   on_result,
+           dbx_on_error_t    on_error, 
+           void            * u_data,
+           int               p_count,
+                             ... )
 {
-  if (!dbxQueue) return 0;
+  uint64_t            result  = 0;                 /* result: 0 -fail */
+  struct dbx_param  * p_list  = NULL;              /* parameters array */
+  va_list             a_list;                      /* arguments macro list */
+  char              * ptr     =(char*) sql_format, /* pointer iterator */
+                    * sql;                         /* result sql */
+  int                 i,                           /* index / iterator */
+                      l       = 0;                 /* length / index */
 
-  int i;
-  for (i=0; i<dbxQueue->count; i++)
+  /* prepare list for params */
+  if ( !(p_list = calloc(p_count, sizeof(struct dbx_param))) )
+    goto finally;
+
+  /* preapare params */
+  va_start(a_list, p_count);
+
+  if (dbx_query_args_to_list( a_list, p_count, p_list ) != CSTUFF_SUCCESS)
+    goto release;
+
+  va_end(a_list);
+
+  /* calculate final size */
+  while (*ptr)
   {
-    if (((dbx_request_t) list_index(dbxQueue, i))->id == id)
-    {
-      ((dbx_request_t) list_index(dbxQueue, i))->on_result = NULL;
-      ((dbx_request_t) list_index(dbxQueue, i))->on_error  = NULL;
-      return id;
-    }
+    if ( (*ptr == '$') && (i = strtol(ptr+1, NULL, 10)) > 0)
+      l += p_list[ i-1 ].length;
+
+    ptr++;
   }
-  return 0;
+  
+  l += ((int) (ptr - sql_format)+1);
+
+  /* make sql string */
+  if ( !(sql = malloc( l*sizeof(char))) )
+    goto release;
+
+  ptr = (char*) sql_format;
+  l   = 0;
+
+  while ( *ptr )
+  {
+    if ( (*ptr == '$') && (i = strtol( ptr+1, &ptr, 10)) > 0 )
+    {
+      i--;
+      strncpy( &sql[l], p_list[i].value, p_list[ i ].length);
+      l += p_list[ i ].length;
+      continue; /* new value of ptr already set */
+    }
+
+    sql[l++] = *(ptr++);
+  }
+
+  /* terminate string with null */
+  sql[l] = 0;
+
+  result = dbx_queue_add(sql, on_result, on_error, u_data);
+
+release:
+  for ( i=0; i<p_count; i++)
+  {
+    if ( ! p_list[i].value ) continue;
+
+    switch( p_list[i].type )
+    {
+      case DBX_STRING:
+        if ( p_list[i].value != dbxNullStr )
+          PQfreemem( (char *) p_list[i].value );
+        break;
+
+      case DBX_BOOLEAN:
+      case DBX_STATEMENT:
+        break;
+
+      case DBX_CONSTANT:
+        if ( p_list[i].value == dbxNullStr )
+          break;
+
+      default:
+        free( (char*) p_list[i].value );
+    }
+
+  }
+  free(p_list);
+
+finally:
+  return result;
+
 }
 
-/* get error message -------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 
+cstuff_retcode_t
+dbx_cancel( uint64_t id )
+{
+  int i;
+  dbx_request_t req;
+  for (i=0; i<dbxQueue->count; i++)
+  {
+    req = (dbx_request_t) list_index(dbxQueue, i);
+    if ( req->id == id)
+    {
+      if ( req->conn )
+      {
+        /* already pending */
+        req->on_result = NULL;
+        req->on_error  = NULL;
+      }
+      else
+      {
+        /* just in queue */
+        dbx_request_free( req );
+        list_remove_index( dbxQueue, i );
+      }
+      return CSTUFF_SUCCESS;
+    }
+  }
 
-char *
+/* -------------------------------------------------------------------------- */
+  return CSTUFF_NOT_FOUND;
+}
+
+/* -------------------------------------------------------------------------- */
+
+const char *
 dbx_get_error()
 {
-  return (dbxConn) ? PQerrorMessage(dbxConn) : "not allocated";
+  return dbxErrorMessage;
+}
+
+/* -------------------------------------------------------------------------- */
+
+int
+dbx_ready_connections_count()
+{
+  uint64_t mask   = dbxConnMask;
+  int      result = 0;
+
+  while (mask)
+  {
+    if ( mask & 1 )
+      result++;
+    mask = mask >> 1;
+  }
+
+  return result;
 }
 
 /* -------------------------------------------------------------------------- */
