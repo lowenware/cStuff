@@ -12,6 +12,17 @@
 
 #include "str-utils.h"
 
+unsigned short 
+file_exists(const char *path) {
+
+    if(!access(path, F_OK | R_OK )) {
+        return 1;
+    }
+
+    return 0;
+
+}
+
 int
 fs_make_file_path( const char * filename )
 {
