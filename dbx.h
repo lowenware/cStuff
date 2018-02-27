@@ -4,6 +4,7 @@
 #define _CSTUFF_DBX_H_
 
 #include <stdint.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <libpq-fe.h>
@@ -30,7 +31,10 @@ typedef enum
 
 /* -------------------------------------------------------------------------- */
 
-#define DBX_FLAG_RECONNECT (1<<0)
+#define DBX_FLAG_RECONNECT   (1<<0)
+
+#define DBX_FLAG_FREE_SQL    (1<<0)
+#define DBX_FLAG_TRANSACTION (1<<1)
 
 /* -------------------------------------------------------------------------- */
 
@@ -75,17 +79,45 @@ dbx_touch();
 
 /* -------------------------------------------------------------------------- */
 
-uint64_t
-dbx_query( const char      * sql_format,
-           dbx_on_result_t   on_result,
-           dbx_on_error_t    on_error, 
-           void            * u_data,
-           int               p_count,
-           /* dbx_param_t       param_type,
-            * __TYPE__          param,  */
-           ... );
+char *
+dbx_sql_format(const char * sql_format, int count, ...);
 
 /* -------------------------------------------------------------------------- */
+
+char *
+dbx_sql_vformat(const char * sql_format, int count, va_list args );
+
+
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_format( const char      * sql_format,
+                  dbx_on_result_t   on_result,
+                  dbx_on_error_t    on_error, 
+                  void            * u_data,
+                  int               p_count,
+                  /* dbx_param_t       param_type,
+                   * __TYPE__          param,  */
+                   ... );
+
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_const( const char      * sql,
+                 dbx_on_result_t   on_result,
+                 dbx_on_error_t    on_error, 
+                 void            * u_data );
+
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_transaction( const char      * sql,
+                       dbx_on_result_t   on_result,
+                       dbx_on_error_t    on_error, 
+                       void            * u_data );
+
+/* -------------------------------------------------------------------------- */
+
 
 cstuff_retcode_t
 dbx_cancel(uint64_t id);
