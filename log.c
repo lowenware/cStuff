@@ -43,7 +43,7 @@ log_set_level(log_t self, const char * level)
 
   if (level)
   {
-    if (strcmp(level, "all") != 0)
+    if (strcmp(level, "full") != 0)
     {
       if (strstr(level, "state")) self->level |= LOG_LEVEL_STATE; else
       if (strstr(level, "alert")) self->level |= LOG_LEVEL_ALERT; else

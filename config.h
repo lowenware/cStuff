@@ -31,8 +31,6 @@
 #ifndef _CSTUFF_CONFIG_H_
 #define _CSTUFF_CONFIG_H_
 
-#include <stdbool.h>
-
 /* macro settings ----------------------------------------------------------- */
 
 #ifndef CONFIG_INITIAL_PATH
@@ -102,7 +100,7 @@ typedef enum {
  * @node   : text representation of node
  * @result : true if parser can continue, false if must stop
  * */
-typedef bool
+typedef int
 (* config_on_get_node_t)( int          line_number,
                           const char * node,
                           void       * u_ptr );
@@ -117,7 +115,7 @@ typedef bool
  *           unnecessary further strlen calls
  * @result : true if parser can continue, false if must stop
  * */
-typedef bool
+typedef int
 (* config_on_get_pair_t)( int          line_number,
                           const char * key,
                           const char * value,
@@ -133,7 +131,7 @@ typedef bool
  * @character : character offset in row
  * @result    : true if parser can continue, false if must stop
  * */
-typedef bool
+typedef int
 (* config_on_syntax_error_t)( int               line_number,
                               int               char_number,
                               const char      * line_text,
