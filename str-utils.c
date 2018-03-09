@@ -347,23 +347,20 @@ str_cat(char * source, const char * target)
 char *
 str_ncat(char * source, const char * target, uint32_t length)
 {
-    char * result = realloc( source, 
-                         length + ((source) ? strlen(source) : 0) + 1
-                      );
-
-    if (source)
-    {
-        strcpy(result, source);
-        free(source);
-    }
-    else
-        result[0]=0;
+  char * result = realloc( source, 
+                    length + ((source) ? strlen(source) : 0) + 1
+                  );
+  if (result)
+  {
+    if (!source)
+      result[0]=0;
 
     if (target && length)
-        strncat(result, target, length);
+      strncat(result, target, length);
 
+  }
 
-    return result;
+  return result;
 }
 
 # endif

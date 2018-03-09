@@ -71,7 +71,8 @@ static uint64_t dbxQueryId;
 struct dbx_request 
 {
   uint64_t           id;
-  char             * sql;
+  const char       * sql;
+  char             * ptr;    /* will be free if is set */
   void             * u_data;
   PGconn           * conn;
   dbx_on_result_t    on_result;
@@ -83,7 +84,8 @@ typedef struct dbx_request * dbx_request_t;
 static void
 dbx_request_free(dbx_request_t req)
 {
-  free( (void *) req->sql);
+  if (req->ptr)
+    free( (void *) req->ptr);
   free(req);
 }
 
@@ -134,9 +136,10 @@ dbx_queue_release( PGconn * conn )
 /* -------------------------------------------------------------------------- */
 
 static uint64_t
-dbx_queue_add(char * sql, dbx_on_result_t  on_result,
-                          dbx_on_error_t   on_error, 
-                          void            *u_data)
+dbx_queue_add(const char * sql, dbx_on_result_t  on_result,
+                                dbx_on_error_t   on_error, 
+                                void            *u_data,
+                                int              do_free )
 {
   dbx_request_t r;
 
@@ -145,6 +148,7 @@ dbx_queue_add(char * sql, dbx_on_result_t  on_result,
 
   r->id        = ++dbxQueryId ? dbxQueryId : ++dbxQueryId;
   r->sql       = sql;
+  r->ptr       = (do_free ? (char*) sql : NULL);
   r->u_data    = u_data;
   r->on_result = on_result;
   r->on_error  = on_error;
@@ -548,19 +552,31 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
 
 /* -------------------------------------------------------------------------- */
 
-uint64_t
-dbx_query( const char      * sql_format,
-           dbx_on_result_t   on_result,
-           dbx_on_error_t    on_error, 
-           void            * u_data,
-           int               p_count,
-                             ... )
+char *
+dbx_sql_format( const char      * sql_format,
+                int               p_count,
+                                  ... )
 {
-  uint64_t            result  = 0;                 /* result: 0 -fail */
+  char * result;
+  va_list args;
+
+  va_start(args, p_count);
+  result = dbx_sql_vformat(sql_format, p_count, args);
+  va_end(args);
+
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
+
+char *
+dbx_sql_vformat( const char      * sql_format,
+                 int               p_count,
+                 va_list           a_list )
+{
   struct dbx_param  * p_list  = NULL;              /* parameters array */
-  va_list             a_list;                      /* arguments macro list */
   char              * ptr     =(char*) sql_format, /* pointer iterator */
-                    * sql;                         /* result sql */
+                    * sql = NULL;                  /* result sql */
   int                 i,                           /* index / iterator */
                       l       = 0;                 /* length / index */
 
@@ -569,12 +585,8 @@ dbx_query( const char      * sql_format,
     goto finally;
 
   /* preapare params */
-  va_start(a_list, p_count);
-
   if (dbx_query_args_to_list( a_list, p_count, p_list ) != CSTUFF_SUCCESS)
     goto release;
-
-  va_end(a_list);
 
   /* calculate final size */
   while (*ptr)
@@ -610,7 +622,6 @@ dbx_query( const char      * sql_format,
   /* terminate string with null */
   sql[l] = 0;
 
-  result = dbx_queue_add(sql, on_result, on_error, u_data);
 
 release:
   for ( i=0; i<p_count; i++)
@@ -640,9 +651,78 @@ release:
   free(p_list);
 
 finally:
-  return result;
+  return sql;
 
 }
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_format( const char      * sql_format,
+                  dbx_on_result_t   on_result,
+                  dbx_on_error_t    on_error, 
+                  void            * u_data,
+                  int               p_count,
+                                    ... )
+{
+  uint64_t   result;         /* result: 0 -fail */
+  char     * sql;            /* result sql */
+  va_list    args;
+
+  va_start(args, p_count);
+  sql = dbx_sql_vformat(sql_format, p_count, args);
+  va_end(args);
+
+  if (sql)
+  {
+    result = dbx_queue_add(sql, on_result, on_error, u_data, 1);
+    if (!result)
+      free(sql);
+  }
+  else
+    result = 0;
+
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_const( const char      * sql,
+                 dbx_on_result_t   on_result,
+                 dbx_on_error_t    on_error, 
+                 void            * u_data )
+{
+  uint64_t   result;         /* result: 0 -fail */
+  result = dbx_queue_add(sql, on_result, on_error, u_data, 0);
+
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
+
+uint64_t
+dbx_query_transaction( const char      * sql,
+                       dbx_on_result_t   on_result,
+                       dbx_on_error_t    on_error, 
+                       void            * u_data )
+{
+  uint64_t   result;         /* result: 0 -fail */
+  char     * t_sql;
+
+  if ( (t_sql = str_printf("BEGIN;\n%sCOMMIT;\n", sql)) != NULL )
+  {
+    result = dbx_queue_add(t_sql, on_result, on_error, u_data, 1);
+    if (!result)
+      free(t_sql);
+  }
+  else
+    result = 0;
+
+  return result;
+}
+
 
 /* -------------------------------------------------------------------------- */
 
