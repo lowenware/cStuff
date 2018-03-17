@@ -7,8 +7,8 @@
 
 #include "retcodes.h"
 #include "list.h"
-#include "sock-utils.h"
 #include "str-utils.h"
+#include "sock-utils.h"
 #include "dbx.h"
 
 /* -------------------------------------------------------------------------- */
@@ -228,18 +228,36 @@ dbx_release()
 {
   int i;
 
-  free(dbxUri);
-
-  list_free(dbxQueue, (list_destructor_t) dbx_request_free);
-
-  for (i=0; i<dbxConnSize; i++)
+  if (dbxUri)
   {
-    if (dbxConnPool[i])
-      PQfinish( dbxConnPool[i] );
+    free(dbxUri);
+    dbxUri = NULL;
   }
 
-  free( dbxConnPool );
-  free( dbxConnCell );
+  if (dbxQueue)
+  {
+    list_free(dbxQueue, (list_destructor_t) dbx_request_free);
+    dbxQueue = NULL;
+  }
+
+  if (dbxConnPool)
+  {
+    for (i=0; i<dbxConnSize; i++)
+    {
+      if (dbxConnPool[i])
+        PQfinish( dbxConnPool[i] );
+
+    }
+
+    free( dbxConnPool );
+    dbxConnPool = NULL;
+  }
+
+  if (dbxConnCell)
+  {
+    free( dbxConnCell );
+    dbxConnCell = NULL;
+  }
 }
 
 /* -------------------------------------------------------------------------- */

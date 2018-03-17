@@ -4,6 +4,10 @@
 
 #include "sock-utils.h"
 
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_SOCK_UTILS_WITH_SELECT
+
 int
 sock_select(int sd, uint32_t wait_usec, int mode)
 {
@@ -27,6 +31,12 @@ sock_select(int sd, uint32_t wait_usec, int mode)
   return select(sd+1, rfs, wfs, NULL, &tv);
 
 }
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_SOCK_UTILS_WITH_SET_ADDRESS
 
 bool
 sock_set_address(struct sockaddr_in * sa, const char * address, int port)
@@ -52,3 +62,7 @@ sock_set_address(struct sockaddr_in * sa, const char * address, int port)
   return true;
 
 }
+
+#endif
+
+/* -------------------------------------------------------------------------- */
