@@ -28,6 +28,8 @@
 #include <stdarg.h>
 #include <aisl/aisl.h>
 
+#include "retcodes.h"
+
 /* types -------------------------------------------------------------------- */
 
 typedef struct templight * templight_t;
