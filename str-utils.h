@@ -116,10 +116,19 @@ str_cmpi(const char * source, const char * target);
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef CSTUFF_STR_UTILS_WITH_TO_INTEGER
+#ifdef CSTUFF_STR_UTILS_WITH_TO_INT
 
-uint64_t
-str_to_integer(const char * ptr, int l);
+int
+str_to_int(const char * ptr, int l, uint32_t * result);
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_TO_INT64
+
+int
+str_to_int64(const char * ptr, int l, uint64_t * result);
 
 #endif
 
