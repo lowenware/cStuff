@@ -390,21 +390,50 @@ str_cmpi(const char * source, const char * target)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef CSTUFF_STR_UTILS_WITH_TO_INTEGER
+#ifdef CSTUFF_STR_UTILS_WITH_TO_INT
 
-uint64_t
-str_to_integer(const char * ptr, int l)
+int
+str_to_int(const char * ptr, int l, int32_t * result)
 {
-  char buffer[20+1];
-  if (l>20) l = 20; /* 20 is length of 2^64 */
+  int64_t b;
+  int rc = str_to_int64(ptr, l, &b);
 
-  memcpy(buffer, ptr, l);
-  buffer[l]=0;
+  *result = b & 0xFFFFFFFF;
 
-  return strtoll(buffer, NULL, 10);
+  return rc;
+}
+
+/* -------------------------------------------------------------------------- */
+
+int
+str_to_int64(const char * ptr, int l, int64_t * result)
+{
+  int    rc;
+  char * src;
+  int    dest;
+
+  if ( (src = str_ncopy(ptr, l)) != NULL )
+  {
+    char * p;
+    dest = strtoll(src, &p, 10);
+
+    rc =  (p && *p == 0) ? CSTUFF_SUCCESS : CSTUFF_PARSE_ERROR;
+
+    free(src);
+  }
+  else
+  {
+    dest = 0;
+    rc = CSTUFF_MALLOC_ERROR;
+  }
+
+  *result = dest;
+
+  return rc;
 }
 
 #endif
+
 
 /* -------------------------------------------------------------------------- */
 #ifdef CSTUFF_STR_UTILS_WITH_CHOP

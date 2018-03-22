@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+#include "retcodes.h"
+
 /* -------------------------------------------------------------------------- */
 
 #ifdef CSTUFF_STR_UTILS_WITH_SET
@@ -119,16 +121,13 @@ str_cmpi(const char * source, const char * target);
 #ifdef CSTUFF_STR_UTILS_WITH_TO_INT
 
 int
-str_to_int(const char * ptr, int l, uint32_t * result);
+str_to_int(const char * ptr, int l, int32_t * result);
 
-#endif
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef CSTUFF_STR_UTILS_WITH_TO_INT64
-
 int
-str_to_int64(const char * ptr, int l, uint64_t * result);
+str_to_int64(const char * ptr, int l, int64_t * result);
 
 #endif
 
