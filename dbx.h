@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <libpq-fe.h>
 
 #include "retcodes.h"
@@ -153,6 +154,11 @@ dbx_ready_connections_count();
         datetime_from_string(                                                  \
             dt_ptr, PQgetvalue(pg_result, row_num, col_num),DATETIME_NTS,"UTC" \
         )
+
+/* -------------------------------------------------------------------------- */
+
+int
+dbx_as_timestamp( PGresult * result, int row_num, int col_num, time_t * p_ts );
 
 /* -------------------------------------------------------------------------- */
 
