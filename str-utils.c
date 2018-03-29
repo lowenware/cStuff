@@ -30,36 +30,29 @@
 
 #ifdef CSTUFF_STR_UTILS_WITH_SET
 
-#ifndef CSTUFF_STR_UTILS_WITH_COPY
-#define CSTUFF_STR_UTILS_WITH_COPY
-#endif
-
 char *
-str_set(char * init, const char * src)
+str_set(char * dst, const char * src)
 {
-    if (init)
+  int len = (src) ? strlen(src) : 0;
+
+  if (!dst || len > strlen(dst))
+  {
+    char * r;
+
+    if ( (r = realloc( dst, len + 1 )) != NULL )
     {
-        if (src)
-        {
-            if (strlen(init) >= strlen(src))
-            {
-                strcpy(init, src);
-                return init;
-            }
-            else
-            {
-                free(init);
-            }
-
-        }
-        else
-        {
-            free(init);
-            return NULL;
-        }
+      dst = r;
     }
+    else
+      return r;
+  }
 
-    return str_copy(src);
+  if (len)
+    strcpy(dst, src, l);
+
+  dst[l]=0;
+
+  return dst;
 }
 
 # endif
