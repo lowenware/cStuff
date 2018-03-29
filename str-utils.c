@@ -48,9 +48,9 @@ str_set(char * dst, const char * src)
   }
 
   if (len)
-    strcpy(dst, src, l);
+    strncpy(dst, src, len);
 
-  dst[l]=0;
+  dst[len]=0;
 
   return dst;
 }
