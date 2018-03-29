@@ -317,7 +317,10 @@ dbx_touch_connection( PGconn * conn )
             if (req->on_result)
             {
               if (!(req->on_result(res, dbxConnCell[dbxConnIter], req->u_data)))
-                break;
+              {
+                req->on_result = NULL;
+                req->on_error = NULL;
+              }
             }
             PQclear(res);
             break;
