@@ -133,6 +133,28 @@ str_to_int64(const char * ptr, int l, int64_t * result);
 
 /* -------------------------------------------------------------------------- */
 
+#ifdef CSTUFF_STR_UTILS_WITH_TO_TIMESTAMP
+
+#include <time.h>
+
+int
+str_to_timestamp(const char * source, size_t l, time_t * ts);
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP
+
+#include <time.h>
+
+char *
+str_from_timestamp(time_t ts);
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
 #ifdef CSTUFF_STR_UTILS_WITH_CHOP
 
 /* chop spaces from string, return number of prepending spaces */

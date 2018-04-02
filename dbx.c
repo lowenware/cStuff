@@ -812,45 +812,8 @@ dbx_as_timestamp( PGresult * data, int row_num, int col_num, time_t * p_ts )
 
   if ( ! PQgetisnull(data, row_num, col_num))
   {
-    result = -1;
-
-    struct tm * tms = calloc(1, sizeof(struct tm));
-
-    if (tms)
-    {
-      char * dt = dbx_as_string(data, row_num, col_num);
-      if (dt)
-      {
-        int l = strlen(dt);
-
-        if ( ! (l < 19) )
-        {
-          char * curtz;
-
-          tms->tm_year  = strtol(dt,      NULL, 10) - 1900;
-          tms->tm_mon   = strtol(&dt[5],  NULL, 10) - 1;
-          tms->tm_mday  = strtol(&dt[8],  NULL, 10);
-          tms->tm_hour  = strtol(&dt[11], NULL, 10);
-          tms->tm_min   = strtol(&dt[14], NULL, 10);
-          tms->tm_sec   = strtol(&dt[17], NULL, 10);
-          tms->tm_isdst = -1;
-
-          curtz = getenv("TZ");
-          setenv("TZ", "UTC", 1);
-
-          *p_ts = mktime(tms);
-
-          if (curtz)
-            setenv("TZ", curtz, 1);
-          else
-            putenv("TZ");
-
-          result = 0;
-        }
-      }
-      free(tms);
-    }
-
+    char * dt = dbx_as_string(data, row_num, col_num);
+    result = (dt) ? str_to_timestamp(dt, strlen(dt), p_ts) : -1;
   }
   else
     result = 1;

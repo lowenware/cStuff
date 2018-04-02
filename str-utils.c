@@ -429,6 +429,80 @@ str_to_int64(const char * ptr, int l, int64_t * result)
 
 
 /* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_TO_TIMESTAMP
+
+#include <time.h>
+
+int
+str_to_timestamp(const char * source, size_t l, time_t * p_ts)
+{
+  int result;
+
+
+  if ( ! (l < 19) )
+  {
+    struct tm * tms = calloc(1, sizeof(struct tm));
+    if (tms)
+    {
+      char * curtz;
+
+      tms->tm_year  = strtol(source,      NULL, 10) - 1900;
+      tms->tm_mon   = strtol(&source[5],  NULL, 10) - 1;
+      tms->tm_mday  = strtol(&source[8],  NULL, 10);
+      tms->tm_hour  = strtol(&source[11], NULL, 10);
+      tms->tm_min   = strtol(&source[14], NULL, 10);
+      tms->tm_sec   = strtol(&source[17], NULL, 10);
+      tms->tm_isdst = -1;
+
+      curtz = getenv("TZ");
+      setenv("TZ", "UTC", 1);
+
+      *p_ts = mktime(tms);
+
+      if (curtz)
+        setenv("TZ", curtz, 1);
+      else
+        putenv("TZ");
+
+      result = 0;
+    }
+    else
+      result = -1;
+  }
+  else 
+    result = 1;
+
+  return result;
+}
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP
+
+#include <time.h>
+
+char *
+str_from_timestamp(time_t ts)
+{
+  char * result;
+
+  if ((result = calloc(32, sizeof(char))) != NULL)
+  {
+    struct tm * p_tm = gmtime(&ts);
+
+    strftime(result, 32, "%Y-%m-%d %H:%M:%S", p_tm);
+  }
+
+  return result;
+}
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
 #ifdef CSTUFF_STR_UTILS_WITH_CHOP
 
 /* chop spaces from string, return number of prepending spaces */
