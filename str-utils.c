@@ -465,6 +465,8 @@ str_to_timestamp(const char * source, size_t l, time_t * p_ts)
       else
         putenv("TZ");
 
+      free(tms);
+
       result = 0;
     }
     else
