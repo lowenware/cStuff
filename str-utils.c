@@ -26,6 +26,10 @@
   
 #include "str-utils.h"
 
+#ifndef CSTUFF_TIMESTAMP_FORMAT 
+#define CSTUFF_TIMESTAMP_FORMAT "%Y-%m-%d %H:%M:%S"
+#endif
+
 /* -------------------------------------------------------------------------- */
 
 #ifdef CSTUFF_STR_UTILS_WITH_SET
@@ -495,7 +499,7 @@ str_from_timestamp(time_t ts)
   {
     struct tm * p_tm = gmtime(&ts);
 
-    strftime(result, 32, "%Y-%m-%d %H:%M:%S", p_tm);
+    strftime(result, 32, CSTUFF_TIMESTAMP_FORMAT, p_tm);
   }
 
   return result;
