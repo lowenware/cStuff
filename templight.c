@@ -926,6 +926,7 @@ _set_value(templight_t self, const char *var_name, char *value)
   for(i=0; i<self->pairs->count; i++)
   {
     p = (pair_t) list_index(self->pairs, i);
+    /* todo: p->key could be null here if {:var } */
     if ( p->node->type == VAR_NODE && strcmp(p->key, var_name)==0 )
     {
       if (result)

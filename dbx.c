@@ -549,7 +549,7 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
           }
 
           value[33]='\'';
-          value[34]='0';
+          value[34]=0;
         }
         break;
 
