@@ -313,12 +313,11 @@ _parse(FILE * fd, list_t stack)
     RAISE( CSTUFF_MALLOC_ERROR, release_buffer );
 
   /* read to buffer */
-  while( (l = fread(&buffer[d_len], 1, b_size - d_len - 1, fd)) > 0 )
+  while( (l = fread(&buffer[d_len], 1, b_size - d_len, fd)) > 0 )
   {
     /* printf("%d = fread(&buffer[%d], 1, %d-%d-1, fd)\n", l, d_len, b_size, d_len); */
     d_len+=l;
 
-    buffer[d_len] = 0;
     cursor = 0;
 
     for (i=0; i<d_len; i++)

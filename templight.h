@@ -26,7 +26,6 @@
 #define _CSTUFF_TEMPLIGHT_H_
 
 #include <stdarg.h>
-#include <aisl/aisl.h>
 
 #include "retcodes.h"
 
@@ -115,6 +114,7 @@ templight_set_vprintf( templight_t self, const char *var_name,
 
 #ifdef CSTUFF_TEMPLIGHT_WITH_TO_AISL_STREAM
 
+#include <aisl/aisl.h>
 int
 templight_to_aisl_stream(templight_t self, aisl_stream_t s);
 
@@ -124,6 +124,7 @@ templight_to_aisl_stream(templight_t self, aisl_stream_t s);
 
 #ifdef CSTUFF_TEMPLIGHT_WITH_TO_FSTREAM
 
+#include <stdio.h>
 int
 templight_to_fstream(templight_t self, FILE * fstream);
 
