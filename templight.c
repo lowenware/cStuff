@@ -889,6 +889,9 @@ templight_new_block(templight_t self, templight_t * block, const char * label)
   }
 
   result = CSTUFF_NOT_FOUND;
+#ifdef DEBUG
+  fprintf(stderr, "templight !- block %s does not exist\n", label);
+#endif
   goto finally;
 
 e_malloc:
@@ -960,6 +963,11 @@ except:
 
 finally:
   if (ptr) free(ptr);
+
+#ifdef DEBUG
+  if (!result)
+    fprintf(stderr, "templight !- variable %s not defined\n", var_name);
+#endif
 
   return result;
 }
