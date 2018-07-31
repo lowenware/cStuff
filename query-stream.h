@@ -37,4 +37,9 @@ query_stream_read(query_stream_t q, const char * data, int size, bool is_full);
 
 /* -------------------------------------------------------------------------- */
 
+int
+query_stream_copy_value(query_stream_t q, const char * key, char ** value);
+
+/* -------------------------------------------------------------------------- */
+
 #endif

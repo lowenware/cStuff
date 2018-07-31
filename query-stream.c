@@ -1,5 +1,7 @@
 #include <stdlib.h>
+#include <string.h>
 
+#include "str-utils.h"
 #include "query-stream.h"
 
 /* -------------------------------------------------------------------------- */
@@ -67,3 +69,21 @@ query_stream_read(query_stream_t q, const char * data, int size, bool is_full)
 
 /* -------------------------------------------------------------------------- */
 
+int
+query_stream_copy_value(query_stream_t q, const char * key, char ** value)
+{
+  if (strncmp(q->key, key, q->key_len)==0)
+  {
+    if ( !(*value) )
+    {
+      if ( !(*value = str_ncopy(q->value, q->value_len)) )
+        return -1;
+    }
+
+    return 0;
+  }
+
+  return 1;
+}
+
+/* -------------------------------------------------------------------------- */
