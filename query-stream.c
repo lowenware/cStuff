@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "str-utils.h"
+#include "uri.h"
 #include "query-stream.h"
 
 /* -------------------------------------------------------------------------- */
@@ -78,6 +79,8 @@ query_stream_copy_value(query_stream_t q, const char * key, char ** value)
     {
       if ( !(*value = str_ncopy(q->value, q->value_len)) )
         return -1;
+
+      uri_decode(*value);
     }
 
     return 0;
