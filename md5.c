@@ -18,17 +18,27 @@ md5_from_string(const char * source, int source_length, char digest[16])
 void
 md5_hash_to_digest(const char * hash, char digest[16])
 {
-  int i;
-  for(i = 0; i < 16; i++)
+  int    total = 16;
+  char   in, out;
+
+  while(total--)
   {
-    sscanf(&hash[i*2], "%2hhx", (unsigned char *) &digest[i]);
+    in = *(hash++);
+    out = (in < 0x3A) ? in - 0x30 : toupper(in) - 0x37;
+    out = out << 4;
+
+    in = *(hash++);
+    out += (((in < 0x3A) ? in - 0x30 : toupper(in) - 0x37) & 0xFF);
+    *(digest++) = out;
   }
+
+
 }
 
 /* -------------------------------------------------------------------------- */
 
 void
-md5_digest_to_hash(char digest[16], char * hash)
+md5_digest_to_hash(char * digest, char * hash)
 {
   int i;
   for (i=0; i<16; i++)
@@ -39,4 +49,3 @@ md5_digest_to_hash(char digest[16], char * hash)
 }
 
 /* -------------------------------------------------------------------------- */
-

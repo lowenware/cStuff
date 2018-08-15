@@ -14,7 +14,7 @@ md5_hash_to_digest(const char * hash, char digest[16]);
 /* -------------------------------------------------------------------------- */
 
 void
-md5_digest_to_hash(char digest[16], char * hash);
+md5_digest_to_hash(char * digest, char * hash);
 
 /* -------------------------------------------------------------------------- */
 
