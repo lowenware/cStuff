@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <openssl/md5.h>
 #include "md5.h"
 
