@@ -10,11 +10,11 @@
  *   All code stored in standard.git repository is designed to solve
  *   very common and widely meet development tasks. We are not about to patent
  *   wheels here, so all code you can find in this repository is FREE:
- *   you can use, redistribute and/or modify it without any limits or 
+ *   you can use, redistribute and/or modify it without any limits or
  *   restrictions.
  *
- *   All code described above is distributed in hope to be useful for somebody 
- *   else WITHOUT ANY WARRANTY, without even the implied warranty of 
+ *   All code described above is distributed in hope to be useful for somebody
+ *   else WITHOUT ANY WARRANTY, without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  *   In case of questions or suggestions, feel free to contact maintainer.
@@ -23,10 +23,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-  
+
 #include "str-utils.h"
 
-#ifndef CSTUFF_TIMESTAMP_FORMAT 
+#ifndef CSTUFF_TIMESTAMP_FORMAT
 #define CSTUFF_TIMESTAMP_FORMAT "%Y-%m-%d %H:%M:%S"
 #endif
 
@@ -94,7 +94,7 @@ str_ncopy(const char * src, uint32_t s)
 
     if (s)
         strncpy(result, src, s);
-    
+
     result[s]=0;
 
     return result;
@@ -143,7 +143,7 @@ str_vprintf(const char * format,  va_list vl)
     const char * pch = format;
 
 
-    
+
     enum {
         wsFormatSearch,
         wsFormatFlags,
@@ -344,7 +344,7 @@ str_cat(char * source, const char * target)
 char *
 str_ncat(char * source, const char * target, uint32_t length)
 {
-  char * result = realloc( source, 
+  char * result = realloc( source,
                     length + ((source) ? strlen(source) : 0) + 1
                   );
   if (result)
@@ -476,7 +476,7 @@ str_to_timestamp(const char * source, size_t l, time_t * p_ts)
     else
       result = -1;
   }
-  else 
+  else
     result = 1;
 
   return result;
@@ -488,18 +488,40 @@ str_to_timestamp(const char * source, size_t l, time_t * p_ts)
 
 #ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP
 
-#include <time.h>
+char *
+str_from_timestamp_iso_utc(time_t ts)
+{
+  return str_from_timestamp(ts, CSTUFF_TIMESTAMP_FORMAT, "UTC");
+}
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP_FORMAT
 
 char *
-str_from_timestamp(time_t ts)
+str_from_timestamp(time_t ts, const char * format, const char * timezone)
 {
   char * result;
+  char * cur_tz;
+
+  if (!timezone)
+    timezone = "UTC";
+
+  cur_tz = getenv("TZ");
+  setenv("TZ", timezone, 1);
+
+  struct tm * p_tm = localtime(&ts);
+
+  if (cur_tz)
+    setenv("TZ", cur_tz, 1);
+  else
+    putenv("TZ");
 
   if ((result = calloc(32, sizeof(char))) != NULL)
   {
-    struct tm * p_tm = gmtime(&ts);
-
-    strftime(result, 32, CSTUFF_TIMESTAMP_FORMAT, p_tm);
+    strftime(result, 32, format, p_tm);
   }
 
   return result;
@@ -507,6 +529,7 @@ str_from_timestamp(time_t ts)
 
 #endif
 
+/* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 
 #ifdef CSTUFF_STR_UTILS_WITH_CHOP

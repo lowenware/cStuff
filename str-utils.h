@@ -10,11 +10,11 @@
  *   All code stored in standard.git repository is designed to solve
  *   very common and widely meet development tasks. We are not about to patent
  *   wheels here, so all code you can find in this repository is FREE:
- *   you can use, redistribute and/or modify it without any limits or 
+ *   you can use, redistribute and/or modify it without any limits or
  *   restrictions.
  *
- *   All code described above is distributed in hope to be useful for somebody 
- *   else WITHOUT ANY WARRANTY, without even the implied warranty of 
+ *   All code described above is distributed in hope to be useful for somebody
+ *   else WITHOUT ANY WARRANTY, without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  *   In case of questions or suggestions, feel free to contact maintainer.
@@ -37,7 +37,7 @@
 #define CSTUFF_STR_UTILS_WITH_COPY
 #endif
 
-/* set init string to src. 
+/* set init string to src.
  * */
 
 /* if init is not set or smaller than src, it will be reallocated
@@ -62,7 +62,7 @@ str_copy(const char * src);
 
 #ifdef CSTUFF_STR_UTILS_WITH_NCOPY
 
-/* copy num bytes from src string to newly allocated one 
+/* copy num bytes from src string to newly allocated one
  * */
 char *
 str_ncopy(const char * src, uint32_t num);
@@ -146,10 +146,25 @@ str_to_timestamp(const char * source, size_t l, time_t * ts);
 
 #ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP
 
+#ifndef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP_FORMAT
+#define CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP_FORMAT
+#endif
+
 #include <time.h>
 
 char *
-str_from_timestamp(time_t ts);
+str_from_timestamp_iso_utc(time_t ts);
+
+#endif
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_FROM_TIMESTAMP_FORMAT
+
+#include <time.h>
+
+char *
+str_from_timestamp(time_t ts, const char * format, const char * timezone);
 
 #endif
 
