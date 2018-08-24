@@ -32,6 +32,11 @@ query_stream_new( char separator );
 
 /* -------------------------------------------------------------------------- */
 
+void
+query_stream_reset(query_stream_t q);
+
+/* -------------------------------------------------------------------------- */
+
 int
 query_stream_read(query_stream_t q, const char * data, int size, bool is_full);
 
