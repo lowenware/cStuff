@@ -506,6 +506,9 @@ str_from_timestamp(time_t ts, const char * format, const char * timezone)
   char * result;
   char * cur_tz;
 
+  if (!format)
+    format = "%c";
+
   if (!timezone)
     timezone = "UTC";
 
@@ -519,9 +522,9 @@ str_from_timestamp(time_t ts, const char * format, const char * timezone)
   else
     putenv("TZ");
 
-  if ((result = calloc(32, sizeof(char))) != NULL)
+  if ((result = calloc(64, sizeof(char))) != NULL)
   {
-    strftime(result, 32, format, p_tm);
+    strftime(result, 64, format, p_tm);
   }
 
   return result;
