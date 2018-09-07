@@ -44,10 +44,10 @@ static int       dbxConnSize;
 static int       dbxConnIter;
 
 /* connection mask 1 = connected, 0 = not connected */
-static uint64_t  dbxConnMask; 
+static uint64_t  dbxConnMask;
 
 /* business mask 1 = busy, 0 = available */
-static uint64_t  dbxConnBusy; 
+static uint64_t  dbxConnBusy;
 
 /* pgres polling and result counter */
 static int     * dbxConnCell;
@@ -68,7 +68,7 @@ static uint64_t dbxQueryId;
 
 /* dbx_request_t ------------------------------------------------------------ */
 
-struct dbx_request 
+struct dbx_request
 {
   uint64_t           id;
   const char       * sql;
@@ -137,7 +137,7 @@ dbx_queue_release( PGconn * conn )
 
 static uint64_t
 dbx_queue_add(const char * sql, dbx_on_result_t  on_result,
-                                dbx_on_error_t   on_error, 
+                                dbx_on_error_t   on_error,
                                 void            *u_data,
                                 int              do_free )
 {
@@ -173,12 +173,13 @@ dbx_init( const char * username,
           int          port,
           int          connections )
 {
-  dbxUri = str_printf( dbxUriFormat, 
+  dbxUri = str_printf( dbxUriFormat,
                        username,
                        password,
                        hostname,
                        port,
                        database );
+
 
   if ( !dbxUri )
     goto e_malloc;
@@ -520,14 +521,14 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
         break;
 
       case DBX_STATEMENT:
-        ch_ptr = va_arg(a_list, char *); 
+        ch_ptr = va_arg(a_list, char *);
         value =  ch_ptr ? ch_ptr : (char*) dbxNullStr;
         break;
 
       case DBX_STRING:
         if ((ch_ptr = va_arg(a_list, char *)) != NULL)
         {
-          if (!conn) 
+          if (!conn)
             conn = dbx_get_allocated_connection();
 
           value = PQescapeLiteral(conn, ch_ptr, strlen(ch_ptr));
@@ -538,19 +539,24 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
         break;
 
       case DBX_MD5_HASH:
-        ch_ptr = va_arg(a_list, char *);
-        if ( (value = malloc( (32+2+1) * sizeof(char))) != NULL )
+        if ((ch_ptr = va_arg(a_list, char *)) != NULL)
         {
-          value[0] ='\'';
-
-          for (j = 0; j < 16; j++)
+          if ( (value = malloc( (32+2+1) * sizeof(char))) != NULL )
           {
-            sprintf(&value[1+j*2], "%02x", ch_ptr[j] & 0xFF);
-          }
+            value[0] ='\'';
 
-          value[33]='\'';
-          value[34]=0;
+            for (j = 0; j < 16; j++)
+            {
+              sprintf(&value[1+j*2], "%02x", ch_ptr[j] & 0xFF);
+            }
+
+            value[33]='\'';
+            value[34]=0;
+          }
         }
+        else
+          value = (char *) dbxNullStr;
+
         break;
 
       case DBX_BOOLEAN:
@@ -617,7 +623,7 @@ dbx_sql_vformat( const char      * sql_format,
 
     ptr++;
   }
-  
+
   l += ((int) (ptr - sql_format)+1);
 
   /* make sql string */
@@ -661,6 +667,7 @@ release:
         break;
 
       case DBX_CONSTANT:
+      case DBX_MD5_HASH:
         if ( p_list[i].value == dbxNullStr )
           break;
 
@@ -682,7 +689,7 @@ finally:
 uint64_t
 dbx_query_format( const char      * sql_format,
                   dbx_on_result_t   on_result,
-                  dbx_on_error_t    on_error, 
+                  dbx_on_error_t    on_error,
                   void            * u_data,
                   int               p_count,
                                     ... )
@@ -712,7 +719,7 @@ dbx_query_format( const char      * sql_format,
 uint64_t
 dbx_query_const( const char      * sql,
                  dbx_on_result_t   on_result,
-                 dbx_on_error_t    on_error, 
+                 dbx_on_error_t    on_error,
                  void            * u_data )
 {
   uint64_t   result;         /* result: 0 -fail */
@@ -726,7 +733,7 @@ dbx_query_const( const char      * sql,
 uint64_t
 dbx_query_transaction( const char      * sql,
                        dbx_on_result_t   on_result,
-                       dbx_on_error_t    on_error, 
+                       dbx_on_error_t    on_error,
                        void            * u_data )
 {
   uint64_t   result;         /* result: 0 -fail */
