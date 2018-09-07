@@ -11,11 +11,11 @@
  *   All code stored in this repository is designed to solve
  *   very common and widely meet development tasks. We are not about to patent
  *   wheels here, so all code you can find in this repository is FREE:
- *   you can use, redistribute and/or modify it without any limits or 
+ *   you can use, redistribute and/or modify it without any limits or
  *   restrictions.
  *
- *   All code described above is distributed in hope to be useful for somebody 
- *   else WITHOUT ANY WARRANTY, without even the implied warranty of 
+ *   All code described above is distributed in hope to be useful for somebody
+ *   else WITHOUT ANY WARRANTY, without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *
  *   In case of questions or suggestions, feel free to contact maintainer.
@@ -206,7 +206,7 @@ static pair_t
 _append_pair(templight_t block, char * key, node_t node)
 {
   pair_t pair;
-  
+
   if (!block->pairs)
   {
     if ( !(block->pairs = list_new(1)) )
@@ -287,7 +287,7 @@ _parse(FILE * fd, list_t stack)
 
   /* vars */
 
-  int     b_size = TEMPLIGHT_BUFFER_SIZE,
+  int     b_size = TEMPLIGHT_BUFFER_SIZE - 1,
           d_len = 0,
           l, i,
           cursor,
@@ -306,7 +306,7 @@ _parse(FILE * fd, list_t stack)
 
   /* allocate resources */
 
-  if ( !(buffer = malloc( b_size )) )
+  if ( !(buffer = malloc( TEMPLIGHT_BUFFER_SIZE )) )
     RAISE( CSTUFF_MALLOC_ERROR, finally );
 
   if ( !(s_bldr = str_builder_new( 0 )) )
@@ -317,6 +317,8 @@ _parse(FILE * fd, list_t stack)
   {
     /* printf("%d = fread(&buffer[%d], 1, %d-%d-1, fd)\n", l, d_len, b_size, d_len); */
     d_len+=l;
+
+    buffer[d_len] = 0;
 
     cursor = 0;
 
@@ -345,7 +347,7 @@ _parse(FILE * fd, list_t stack)
           /* close current plain node */
           if (str_builder_append_chars(s_bldr, &buffer[ cursor ], i-cursor)==-1)
             goto e_malloc;
-          
+
 
           if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
             goto e_malloc;
@@ -410,7 +412,7 @@ _parse(FILE * fd, list_t stack)
 
           if ( !(pair=_append_pair( pr, s_bldr->c_str, node)) )
             goto e_malloc;
-          
+
           memset( s_bldr, 0, sizeof( struct str_builder ) );
 
           if ( list_append(stack, (void*) bl) == -1)
@@ -464,7 +466,7 @@ _parse(FILE * fd, list_t stack)
 
       /* printf("PLAIN 2: %s\n", s_bldr->c_str);
       if ( !(_append_node(pr, PLAIN_NODE, s_bldr->c_str, s_bldr->length)) )
-        goto e_malloc; 
+        goto e_malloc;
 
       memset( s_bldr, 0, sizeof( struct str_builder ) );
       */
@@ -502,7 +504,7 @@ _parse(FILE * fd, list_t stack)
   /* check stack */
   if (stack->count > 1)
   {
-     /*fprintf(stderr, "[templight] block is not closed %s\n", 
+     /*fprintf(stderr, "[templight] block is not closed %s\n",
      ((templight_t) list_index(stack, stack->count-1))->name); */
      result = CSTUFF_PARSE_ERROR;
      goto e_malloc;
@@ -552,7 +554,7 @@ bak_parse_line(list_t stack, char * b, int line)
 
   / * handle the begining of block * /
   begin = strstr(b, "{:begin ");
-  if (begin) 
+  if (begin)
   {
     begin += 8;
     end = strstr(begin, "}");
@@ -589,7 +591,7 @@ bak_parse_line(list_t stack, char * b, int line)
   while ( (begin = strstr(end, "{:var ")) )
   {
     / * some text before label * /
-    if (begin > end) 
+    if (begin > end)
     {
       l = (int) (begin-end);
       _append_node( block, PLAIN_NODE, str_ncopy(end, l), l);
@@ -839,7 +841,7 @@ finally:
 int
 templight_new_block(templight_t self, templight_t * block, const char * label)
 {
-  int         result, 
+  int         result,
               i;
   pair_t      p;
   node_t      n;
@@ -917,7 +919,7 @@ _set_value(templight_t self, const char *var_name, char *value)
 
   result = 0;
 
-    
+
   if (!self->pairs)
     return result;
 
@@ -975,7 +977,7 @@ finally:
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_printf(templight_t self, const char * var_name, 
+templight_set_printf(templight_t self, const char * var_name,
                                        const char * format, ...)
 {
   va_list list;
@@ -988,7 +990,7 @@ templight_set_printf(templight_t self, const char * var_name,
 /* -------------------------------------------------------------------------- */
 
 int
-templight_set_vprintf(templight_t self, const char * var_name, 
+templight_set_vprintf(templight_t self, const char * var_name,
                                         const char * format,
                                         va_list      list)
 {
