@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "str-utils.h"
 #include "post-utils.h"
@@ -69,24 +70,36 @@ post_query_read(post_query_t self, post_query_on_pair_t on_pair, void * u_ptr)
 {
   query_stream_t q = &self->query_stream;
 
-  int result,
+  int result = 1,
       res,         /* parser result */
+      read   = 0,
       total  = self->data_size;
 
   char * data = self->data;
 
-  res = query_stream_read(q, data, total, (self->content_length == 0));
+  result = 1;
 
-  result = (res > 0) ? on_pair(q, u_ptr) : 1;
+  fprintf(stderr, ": DATA: %s, %u, %u\n", data, total, self->content_length);
 
-  total = total - res;
+  while (
+    (res = query_stream_read(q, data, total, (self->content_length == 0))) > 0
+  )
+  {
+    result = on_pair(q, u_ptr);
+    fprintf(stderr, ": res=%d, result=%d\n", res, result);
 
-  self->data_size = total;
+    read = res;
+
+    if (result != 0)
+      break;
+  }
+
+  total -= read;
 
   if (total)
-    memmove(data, &data[res], total);
-  else
-    *data = 0;
+    memmove(data, &data[read], total);
+
+  data[total] = 0;
 
   return result;
 }
