@@ -138,7 +138,7 @@ str_to_int64(const char * ptr, int l, int64_t * result);
 #include <time.h>
 
 int
-str_to_timestamp(const char * source, size_t l, time_t * ts);
+str_to_timestamp(const char * source, size_t l, time_t * p_ts, const char * tz);
 
 #endif
 

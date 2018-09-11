@@ -439,10 +439,12 @@ str_to_int64(const char * ptr, int l, int64_t * result)
 #include <time.h>
 
 int
-str_to_timestamp(const char * source, size_t l, time_t * p_ts)
+str_to_timestamp(const char * source, size_t l, time_t * p_ts, const char * tz)
 {
   int result;
 
+  if (!tz)
+    tz = "UTC";
 
   if ( ! (l < 19) )
   {
@@ -460,7 +462,7 @@ str_to_timestamp(const char * source, size_t l, time_t * p_ts)
       tms->tm_isdst = -1;
 
       curtz = getenv("TZ");
-      setenv("TZ", "UTC", 1);
+      setenv("TZ", tz, 1);
 
       *p_ts = mktime(tms);
 
