@@ -820,7 +820,7 @@ dbx_as_timestamp( PGresult * data, int row_num, int col_num, time_t * p_ts )
   if ( ! PQgetisnull(data, row_num, col_num))
   {
     char * dt = dbx_as_string(data, row_num, col_num);
-    result = (dt) ? str_to_timestamp(dt, strlen(dt), p_ts) : -1;
+    result = (dt) ? str_to_timestamp(dt, strlen(dt), p_ts, NULL) : -1;
   }
   else
     result = 1;
