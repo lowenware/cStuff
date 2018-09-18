@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <locale.h>
 
 #include "retcodes.h"
 #include "list.h"
@@ -483,6 +484,8 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
          * value;
   PGconn * conn = NULL;
 
+  long double f;
+
 
   for (i=0; i<p_count; i++)
   {
@@ -536,6 +539,13 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
         else
           value = (char *) dbxNullStr;
 
+        break;
+
+      case DBX_FLOAT:
+        f = va_arg(a_list, long double);
+        setlocale(LC_ALL, "C");
+        value=str_printf("%f", f);
+        setlocale(LC_ALL, "");
         break;
 
       case DBX_MD5_HASH:

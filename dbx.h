@@ -21,6 +21,8 @@ typedef enum
   DBX_INT64,
   DBX_UINT64,
 
+  DBX_FLOAT,
+
   DBX_STRING,
   DBX_CONSTANT,
   DBX_MD5_HASH,
@@ -94,7 +96,7 @@ dbx_sql_vformat(const char * sql_format, int count, va_list args );
 uint64_t
 dbx_query_format( const char      * sql_format,
                   dbx_on_result_t   on_result,
-                  dbx_on_error_t    on_error, 
+                  dbx_on_error_t    on_error,
                   void            * u_data,
                   int               p_count,
                   /* dbx_param_t       param_type,
@@ -106,7 +108,7 @@ dbx_query_format( const char      * sql_format,
 uint64_t
 dbx_query_const( const char      * sql,
                  dbx_on_result_t   on_result,
-                 dbx_on_error_t    on_error, 
+                 dbx_on_error_t    on_error,
                  void            * u_data );
 
 /* -------------------------------------------------------------------------- */
@@ -114,7 +116,7 @@ dbx_query_const( const char      * sql,
 uint64_t
 dbx_query_transaction( const char      * sql,
                        dbx_on_result_t   on_result,
-                       dbx_on_error_t    on_error, 
+                       dbx_on_error_t    on_error,
                        void            * u_data );
 
 /* -------------------------------------------------------------------------- */
