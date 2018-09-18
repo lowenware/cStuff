@@ -486,7 +486,6 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
 
   long double f;
 
-
   for (i=0; i<p_count; i++)
   {
     value          = NULL;
@@ -526,6 +525,12 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
       case DBX_STATEMENT:
         ch_ptr = va_arg(a_list, char *);
         value =  ch_ptr ? ch_ptr : (char*) dbxNullStr;
+        break;
+
+      case DBX_TIMESTAMP:
+        value = str_from_timestamp(
+                  va_arg(a_list, time_t), "'%Y-%m-%d %H:%M:%S'", NULL
+                );
         break;
 
       case DBX_STRING:

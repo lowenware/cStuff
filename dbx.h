@@ -22,6 +22,7 @@ typedef enum
   DBX_UINT64,
 
   DBX_FLOAT,
+  DBX_TIMESTAMP,
 
   DBX_STRING,
   DBX_CONSTANT,
