@@ -544,7 +544,7 @@ dbx_query_args_to_list( va_list a_list, int p_count, struct dbx_param * p_list )
       case DBX_FLOAT:
         f = va_arg(a_list, long double);
         setlocale(LC_ALL, "C");
-        value=str_printf("%f", f);
+        value=str_printf("%.8Lf", f);
         setlocale(LC_ALL, "");
         break;
 
