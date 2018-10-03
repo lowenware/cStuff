@@ -43,8 +43,11 @@ post_query_feed_data(post_query_t self, const char * data, int len)
 {
   char * p_data;
 
+
   if ( (p_data = str_ncat(self->data, data, len)) != NULL )
   {
+    fprintf(stderr, "post_query_feed_data (%d) : %s\n", len, p_data);
+    
     if (self->content_length < len)
       return -1;
 
