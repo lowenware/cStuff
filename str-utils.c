@@ -567,3 +567,61 @@ str_chop(char * source)
 # endif
 
 /* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_STR_UTILS_WITH_REPLACE
+
+char *
+str_replace(const char * haystack, const char * needle, const char * value)
+{
+  size_t h_len,
+         n_len = strlen(needle),
+         v_len,
+         match = 0;
+
+  char * cur = (char *) haystack,
+       * ptr,
+       * result,
+       * out;
+
+  while ( (ptr = strstr(cur, needle)) != NULL )
+  {
+    cur = (char *)(ptr + n_len);
+    match++;
+  }
+
+  if (!match)
+    return (char*) haystack;
+
+  v_len = strlen(value);
+  h_len = strlen(haystack) - match * n_len + match * v_len + 1;
+
+  if ((result = calloc(h_len, sizeof(char))) != NULL)
+  {
+    cur = (char *) haystack;
+    out = result;
+
+    while ( (ptr = strstr(cur, needle)) != NULL )
+    {
+      if (cur == haystack && ptr != haystack)
+      {
+        strncpy(result, haystack, (int)(ptr-haystack));
+        out += (int)(ptr-haystack);
+      }
+
+      strncpy(out, value, v_len);
+
+      out += v_len;
+
+      cur = (char *)(ptr + n_len);
+    }
+
+    if (*cur)
+      strcpy(out, cur);
+  }
+
+  return result;
+}
+
+# endif
+
+/* -------------------------------------------------------------------------- */

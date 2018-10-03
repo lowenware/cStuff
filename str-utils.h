@@ -180,5 +180,14 @@ str_chop(char * source);
 
 /* -------------------------------------------------------------------------- */
 
+#ifdef CSTUFF_STR_UTILS_WITH_REPLACE
+
+char *
+str_replace(const char * haystack, const char * needle, const char * value);
+
+# endif
+
+/* -------------------------------------------------------------------------- */
+
 
 #endif
