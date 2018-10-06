@@ -7,7 +7,7 @@
 
 /* Log Levels --------------------------------------------------------------- */
 
-#define LOG_ALL  ( LOG_LEVEL_ERROR | LOG_LEVEL_ALERT | \
+#define LOG_FULL ( LOG_LEVEL_ERROR | LOG_LEVEL_ALERT | \
                    LOG_LEVEL_STATE | LOG_LEVEL_DEBUG )
 
 typedef enum
@@ -20,11 +20,38 @@ typedef enum
 
 } log_level_t;
 
+#ifndef LOG_MARKER_ERROR
+#define LOG_MARKER_ERROR "!!"
+#endif
+
+#ifndef LOG_MARKER_ALERT
+#define LOG_MARKER_ALERT "!-"
+#endif
+
+#ifndef LOG_MARKER_STATE
+#define LOG_MARKER_STATE "--"
+#endif
+
+#ifndef LOG_MARKER_DEBUG
+#define LOG_MARKER_DEBUG "**"
+#endif
+
+extern const char
+    log_marker_error[]
+  , log_marker_alert[]
+  , log_marker_state[]
+  , log_marker_debug[]
+  ;
+
 /* Log Structure ------------------------------------------------------------ */
 
 struct log
 {
+#ifdef CSTUFF_LOG_WITH_SET_FILE
+  char       * file;
+#else
   const char * file;
+#endif
   int          level;
 };
 
@@ -51,6 +78,14 @@ log_free(log_t self);
 void
 log_set_level(log_t self, const char * level);
 
+/* -------------------------------------------------------------------------- */
+
+#ifdef CSTUFF_LOG_WITH_SET_FILE
+
+int
+log_set_file(log_t self, const char * file);
+
+#endif
 /* -------------------------------------------------------------------------- */
 
 /* save formated message to log

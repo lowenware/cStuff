@@ -8,6 +8,15 @@
 
 /* -------------------------------------------------------------------------- */
 
+const char
+    log_marker_error[] = LOG_MARKER_ERROR
+  , log_marker_alert[] = LOG_MARKER_ALERT
+  , log_marker_state[] = LOG_MARKER_STATE
+  , log_marker_debug[] = LOG_MARKER_DEBUG
+  ;
+
+/* -------------------------------------------------------------------------- */
+
 #ifdef CSTUFF_LOG_WITH_STDLOG
 
 struct log stdlog = {NULL, 0};
@@ -51,7 +60,7 @@ log_set_level(log_t self, const char * level)
       if (strstr(level, "debug")) self->level |= LOG_LEVEL_DEBUG;
     }
     else
-      self->level = LOG_ALL;
+      self->level = LOG_FULL;
   }
 }
 
@@ -116,5 +125,3 @@ log_printf(log_t self, log_level_t level, const  char * format, ... )
 
   return result;
 }
-
-
