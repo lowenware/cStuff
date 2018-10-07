@@ -46,21 +46,37 @@ log_free(log_t self)
 /* -------------------------------------------------------------------------- */
 
 void
-log_set_level(log_t self, const char * level)
+log_set_level(log_t self, const char * level, size_t size)
 {
   self->level = 0;
 
   if (level)
   {
-    if (strcmp(level, "full") != 0)
+    if (size == 4 && strncmp(level, "full", 4) == 0)
     {
-      if (strstr(level, "state")) self->level |= LOG_LEVEL_STATE; else
-      if (strstr(level, "alert")) self->level |= LOG_LEVEL_ALERT; else
-      if (strstr(level, "error")) self->level |= LOG_LEVEL_ERROR; else
-      if (strstr(level, "debug")) self->level |= LOG_LEVEL_DEBUG;
+      self->level = LOG_FULL;
     }
     else
-      self->level = LOG_FULL;
+    {
+      while ( !(size < 5) )
+      {
+        int shift = 5;
+
+        if (strncmp(level, "state", 5) == 0)
+          self->level |= LOG_LEVEL_STATE;
+        else if (strncmp(level, "alert", 5) == 0)
+          self->level |= LOG_LEVEL_ALERT;
+        else if (strncmp(level, "error", 5) == 0)
+          self->level |= LOG_LEVEL_ERROR;
+        else if (strncmp(level, "debug", 5) == 0)
+          self->level |= LOG_LEVEL_DEBUG;
+        else
+          shift = 1;
+
+        size -= shift;
+        level += shift;
+      }
+    }
   }
 }
 

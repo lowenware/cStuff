@@ -5,6 +5,9 @@
 
 #include "config.h"
 
+#ifndef CMAKE_CONFIG_SUCCESS_VALUE
+#define CMAKE_CONFIG_SUCCESS_VALUE 1
+#endif
 /* types -------------------------------------------------------------------- */
 
 struct config_line
@@ -240,7 +243,7 @@ config_parse( const char               * filename,
   int                l_num  = 0,
                      level  = 0,
                      l      = 0,
-                     indent = 0, 
+                     indent = 0,
                      offset;
 
   char             * buffer;
@@ -261,7 +264,7 @@ config_parse( const char               * filename,
         {
           if (on_syntax_error)
           {
-            if (on_syntax_error( l_num, offset, buffer, result, u_ptr))
+            if (on_syntax_error( l_num, offset, buffer, result, u_ptr) == CMAKE_CONFIG_SUCCESS_VALUE)
               continue;
           }
 
@@ -283,7 +286,7 @@ config_parse( const char               * filename,
             result = CONFIG_INDENT_ERROR;
             if (on_syntax_error)
             {
-              if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
+              if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr)== CMAKE_CONFIG_SUCCESS_VALUE)
                 continue;
             }
             break;
@@ -295,7 +298,7 @@ config_parse( const char               * filename,
         {
           if (on_syntax_error)
           {
-            if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr))
+            if (on_syntax_error(l_num, line.i_key, buffer, result, u_ptr)== CMAKE_CONFIG_SUCCESS_VALUE)
               continue;
             break;
           }
@@ -313,7 +316,7 @@ config_parse( const char               * filename,
           level = l;
           if (on_get_node)
           {
-            if ( !on_get_node(l_num, path, u_ptr))
+            if ( on_get_node(l_num, path, u_ptr)!= CMAKE_CONFIG_SUCCESS_VALUE)
             {
               result = CONFIG_READ_NODE_ERROR;
               break;
@@ -323,11 +326,11 @@ config_parse( const char               * filename,
         else
         {
           buffer[ line.i_value + line.l_value ] = 0;
-          
+
           if (on_get_pair)
           {
-            if (!on_get_pair(
-                  l_num, path, &buffer[line.i_value], line.l_value, u_ptr))
+            if (on_get_pair(
+                  l_num, path, &buffer[line.i_value], line.l_value, u_ptr)!= CMAKE_CONFIG_SUCCESS_VALUE)
             {
               result = CONFIG_READ_PAIR_ERROR;
               break;
@@ -346,7 +349,7 @@ config_parse( const char               * filename,
   }
   else
     result = CONFIG_ALLOC_ERROR;
-  
+
   fclose(f);
 
   return result;

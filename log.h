@@ -4,6 +4,7 @@
 /* Class log_t -------------------------------------------------------------- */
 
 #include <stdarg.h>
+#include <stdio.h>
 
 /* Log Levels --------------------------------------------------------------- */
 
@@ -47,11 +48,8 @@ extern const char
 
 struct log
 {
-#ifdef CSTUFF_LOG_WITH_SET_FILE
-  char       * file;
-#else
+  FILE       * fd;
   const char * file;
-#endif
   int          level;
 };
 
@@ -76,16 +74,8 @@ log_free(log_t self);
 /* -------------------------------------------------------------------------- */
 
 void
-log_set_level(log_t self, const char * level);
+log_set_level(log_t self, const char * level, size_t size);
 
-/* -------------------------------------------------------------------------- */
-
-#ifdef CSTUFF_LOG_WITH_SET_FILE
-
-int
-log_set_file(log_t self, const char * file);
-
-#endif
 /* -------------------------------------------------------------------------- */
 
 /* save formated message to log
