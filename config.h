@@ -38,7 +38,7 @@
 #endif
 
 #ifndef CONFIG_INITIAL_BUFFER
-#define CONFIG_INITIAL_BUFFER 82
+#define CONFIG_INITIAL_BUFFER 256
 #endif
 
 /* macro helpres ------------------------------------------------------------ */

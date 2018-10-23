@@ -101,7 +101,7 @@ log_vprintf(log_t self, log_level_t level, const char * format, va_list args)
   {
     time (&rawtime);
     localtime_r (&rawtime, &timeinfo);
-    strftime (strtime, 32, "%c", &timeinfo);
+    strftime (strtime, 32, "%F %T", &timeinfo);
 
     switch (level)
     {
