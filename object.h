@@ -75,8 +75,8 @@
 #define cast( OBJECT, CLASS_NAME ) ((CLASS_NAME##_t)(OBJECT))
 
 
-#define SUPER_OBJECT_CLASS( OBJECT, CLASS_NAME ) (\
-    (CLASS_NAME##_class_t) OBJECT(OBJECT)->object_class \
+#define SUPER_OBJECT_CLASS( X, CLASS_NAME ) (\
+    (CLASS_NAME##_class_t) OBJECT(X)->object_class \
 ) \
 
 #define SUPER_CLASS( CLASS_NAME ) ( (object_class_t) &g_##CLASS_NAME##_class )
