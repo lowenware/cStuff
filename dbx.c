@@ -174,6 +174,8 @@ dbx_init( const char * username,
           int          port,
           int          connections )
 {
+  if (!port)
+    port = 5432;
   dbxUri = str_printf( dbxUriFormat,
                        username,
                        password,
