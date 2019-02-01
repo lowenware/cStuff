@@ -36,10 +36,10 @@ static char    * dbxUri;
 /* -------------------------------------------------------------------------- */
 
 /* connections pointers */
-PGconn        ** dbxConnPool;
+PGconn        ** dbxConnPool = NULL;
 
 /* connections number */
-static int       dbxConnSize;
+static int       dbxConnSize = 0;
 
 /* connections number */
 static int       dbxConnIter;
@@ -843,4 +843,36 @@ dbx_as_timestamp( PGresult * data, int row_num, int col_num, time_t * p_ts )
     result = 1;
 
   return result;
+}
+
+
+int
+dbx_sleep(int usec)
+{
+  fd_set  fs;
+
+  struct timeval tv;
+
+  tv.tv_sec  = 0;
+  tv.tv_usec = usec;
+
+
+  if (dbxConnPool)
+  {
+    FD_ZERO (&fs);
+
+    int maxsd = 0;
+
+    for (int i=0; i< dbxConnSize; i++)
+    {
+      int sd = PQsocket(dbxConnPool[i]);
+      FD_SET(sd, &fs);
+      if (sd > maxsd)
+        maxsd = sd;
+    }
+
+    return select(maxsd+1, &fs, NULL, NULL, &tv);
+  }
+
+  return 0;
 }
